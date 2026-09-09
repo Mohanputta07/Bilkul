@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bilkul — Restaurant POS & Live Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Export Libraries: SheetJS for Excel, docx.js + FileSaver for Word -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<!-- Firebase SDKs (v9 Modular Compat Mode for Browser Script Tag Usage) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+
+<style>
+  :root{
+    --ink:#1F2523;
+    --paper:#F7F3E8;
+    --paper2:#FBF8F0;
+    --saffron:#E8A33D;
+    --saffron-deep:#C9832A;
+    --teal:#1D4E4A;
+    --teal-deep:#153A37;
+    --chili:#C1442E;
+    --line:#C9CDBF;
+    --line-soft:#DEDFD3;
+    --shadow: 0 1px 0 rgba(31,37,34,0.06);
+    --maxw: 1180px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{
+    font-family:'Big Shoulders Display', sans-serif;
+    font-weight:700;
+    letter-spacing:0.2px;
+    margin:0;
+    color:var(--ink);
+  }
+  .num, .money, .mono{ font-family:'IBM Plex Mono', monospace; }
+  a{color:inherit;}
+  img,svg{display:block;max-width:100%;}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 20px;}
+  section{position:relative;}
+  button, input, select{font-family:inherit;}
+
+  :focus-visible{
+    outline:3px solid var(--teal);
+    outline-offset:2px;
+  }
+
+  /* AUTH MODAL & CONTAINER STYLES */
+  #authContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    padding: 20px;
+  }
+  .auth-card {
+    background: var(--paper2);
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    padding: 30px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+  }
+  .auth-card h2 { font-size: 32px; margin-bottom: 8px; }
+  .auth-card p { font-size: 14px; color: #6B7370; margin-bottom: 20px; }
+  .auth-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .auth-tab-btn {
+    flex: 1; padding: 10px; background: transparent; border: none; font-weight: 700;
+    font-family: 'Big Shoulders Display', sans-serif; font-size: 18px; cursor: pointer; color: #6B7370;
+  }
+  .auth-tab-btn.active { color: var(--teal-deep); border-bottom: 3px solid var(--teal); }
+
+  /* HEADER NAV */
+  header.nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(247,243,232,0.98);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .nav-row{
+    display:flex; align-items:center; justify-content:space-between;
+    height:64px; gap:16px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:8px; 
+    font-family:'Big Shoulders Display',sans-serif; font-weight:800; font-size:24px;
+    flex-shrink:0;
+  }
+  .brand .tickmark{width:22px;height:26px;}
+
+  .nav-links{
+    display:flex; gap:8px; align-items:center;
+    overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  }
+  .nav-links::-webkit-scrollbar{display:none;}
+  
+  .nav-btn{
+    background:transparent; border:none; padding:8px 14px; font-size:16px; font-weight:700;
+    color:#6B7370; cursor:pointer; transition:all 0.15s; white-space:nowrap;
+    font-family:'Big Shoulders Display', sans-serif; letter-spacing:0.5px;
+    border-radius:4px;
+  }
+  .nav-btn:hover{color:var(--ink); background:rgba(0,0,0,0.03);}
+  .nav-btn.active{
+    color:var(--teal-deep); background:var(--paper2); border:1px solid var(--line);
+  }
+
+  .user-badge {
+    font-size: 12px; font-weight: 600; color: var(--teal-deep); background: rgba(29, 78, 74, 0.1);
+    padding: 4px 10px; border-radius: 20px; font-family: 'IBM Plex Mono', monospace; display: flex; align-items: center; gap: 8px;
+  }
+  .btn-logout {
+    background: var(--chili); color: #fff; border: none; border-radius: 4px; padding: 4px 8px;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+  }
+
+  /* HERO */
+  .hero{padding:24px 0 20px;}
+  .hero h1{font-size:clamp(28px, 4vw, 42px); line-height:1.05; max-width:22ch;}
+  .free-badge{
+    display:inline-block; background:var(--teal); color:var(--paper2);
+    font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600;
+    padding:3px 10px; border-radius:20px; margin-bottom:8px; text-transform:uppercase;
+  }
+  .hero p.lead{margin-top:8px; font-size:15px; max-width:58ch; color:#3A423F;}
+
+  /* TAB CONTENT PANELS */
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .app-grid{display:grid; grid-template-columns: 1.2fr 0.8fr; gap:20px; align-items:start;}
+  @media(max-width:850px){ .app-grid{grid-template-columns:1fr;} }
+
+  .app-card{
+    background:var(--paper2); border:1.5px solid var(--line); border-radius:8px; padding:20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow-x:auto;
+  }
+  .app-card h3{font-size:22px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;}
+
+  .menu-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; margin-bottom:16px;}
+  .menu-btn{
+    background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:10px;
+    text-align:left; transition:all 0.15s; cursor:pointer;
+  }
+  .menu-btn:hover{border-color:var(--teal); background:#FFF;}
+  .menu-btn .name{font-weight:600; font-size:13.5px; display:block;}
+  .menu-btn .price{font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--teal-deep);}
+
+  .bill-table{width:100%; border-collapse:collapse; margin-bottom:16px; font-size:13.5px; min-width:300px;}
+  .bill-table th{text-align:left; border-bottom:1px solid var(--line); padding-bottom:6px; font-size:11.5px; color:#6B7370;}
+  .bill-table td{padding:8px 0; border-bottom:1px solid var(--line-soft);}
+  .qty-controls{display:flex; gap:6px; align-items:center;}
+  .qty-btn{width:22px; height:22px; border:1px solid var(--line); background:var(--paper); border-radius:3px; line-height:1; cursor:pointer;}
+
+  .discount-box{
+    display:flex; gap:8px; align-items:center; margin-bottom:12px; padding:8px;
+    background:rgba(232, 163, 61, 0.1); border:1px solid var(--line); border-radius:4px;
+  }
+  .discount-box label{font-size:11.5px; font-weight:600; color:var(--ink); white-space:nowrap;}
+  .discount-box input{
+    width:70px; padding:4px 6px; border:1px solid var(--line); border-radius:3px;
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; background:#FFF;
+  }
+  .discount-box select{
+    padding:4px 6px; border:1px solid var(--line); border-radius:3px;
+    font-size:12px; background:#FFF; font-weight:600;
+  }
+
+  .bill-summary{border-top:2px dashed var(--line); padding-top:12px; font-family:'IBM Plex Mono', monospace;}
+  .summary-row{display:flex; justify-content:space-between; margin-bottom:6px; font-size:13.5px;}
+  .summary-row.discount{color:var(--chili); font-weight:500;}
+  .summary-row.total{font-size:16.5px; font-weight:700; color:var(--ink); border-top:1px solid var(--ink); padding-top:8px; margin-top:8px;}
+
+  .action-btns{display:flex; gap:10px; margin-top:16px;}
+  .btn-action{
+    flex:1; padding:10px; border:none; border-radius:4px; font-weight:700; font-size:13.5px; text-align:center; cursor:pointer;
+  }
+  .btn-pay{background:var(--saffron); color:var(--ink); box-shadow:0 2px 0 var(--saffron-deep);}
+  .btn-pay:hover{background:#df972f;}
+  .btn-clear{background:transparent; border:1px solid var(--line); color:var(--ink);}
+
+  .form-group-grid{display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-bottom:12px;}
+  .recipe-builder-box{background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px;}
+  .ingredient-row{display:grid; grid-template-columns: 1.5fr 1fr auto; gap:10px; align-items:end; margin-bottom:8px;}
+
+  .stock-entry-grid{display:grid; grid-template-columns: 1.2fr 1fr 1fr auto; gap:10px; align-items:end;}
+  .adjust-stock-grid{display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.5fr auto; gap:10px; align-items:end;}
+
+  @media(max-width:850px){ 
+    .form-group-grid{grid-template-columns:1fr;} 
+    .ingredient-row{grid-template-columns:1fr;}
+    .stock-entry-grid{grid-template-columns:1fr;}
+    .adjust-stock-grid{grid-template-columns:1fr;}
+  }
+  
+  .form-field{display:flex; flex-direction:column; gap:4px;}
+  .form-field label{font-size:11.5px; font-weight:600; color:#6B7370;}
+  .form-field input, .form-field select{
+    padding:8px; border:1px solid var(--line); border-radius:4px; font-size:13.5px; background:var(--paper); width:100%;
+  }
+  .recipe-builder-box .form-field input, .recipe-builder-box .form-field select{ background:#FFF; }
+
+  .btn-add{
+    background:var(--teal); color:var(--paper2); border:none; padding:9px 14px; border-radius:4px; font-weight:600; cursor:pointer; height:37px; font-size:13.5px;
+  }
+  .btn-add:hover{background:var(--teal-deep);}
+
+  .btn-secondary{
+    background:transparent; border:1px solid var(--teal); color:var(--teal); padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:12.5px;
+  }
+  .btn-secondary:hover{background:rgba(29,78,74,0.08);}
+
+  .btn-adjust{
+    background:var(--saffron-deep); color:#FFF; border:none; padding:9px 14px; border-radius:4px; font-weight:600; cursor:pointer; height:37px; font-size:13.5px;
+  }
+  .btn-adjust:hover{background:#b07020;}
+
+  .edit-price-input{
+    width:75px; padding:4px 6px; border:1px solid var(--line); border-radius:3px; font-family:'IBM Plex Mono', monospace;
+  }
+  .btn-remove{
+    background:transparent; border:1px solid var(--chili); color:var(--chili); padding:4px 8px; border-radius:3px; font-size:11.5px; font-weight:600; cursor:pointer;
+  }
+  .btn-remove:hover{background:var(--chili); color:#FFF;}
+
+  .reports-card{background:var(--teal-deep); color:var(--paper2); border-radius:8px; padding:24px;}
+  .reports-card h3{color:var(--paper2); font-size:24px;}
+  .metrics-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin:16px 0;}
+  .metric-card{background:rgba(255,255,255,0.06); padding:14px; border-radius:6px; border:1px solid rgba(255,255,255,0.1);}
+  .metric-card span{display:block; font-size:12px; color:#A9AFA9;}
+  .metric-card b{font-family:'IBM Plex Mono', monospace; font-size:20px; color:var(--saffron); margin-top:4px; display:block;}
+
+  .export-bar { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  .btn-export-excel {
+    background: #276749; color: #FFF; border: none; padding: 8px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px;
+  }
+  .btn-export-excel:hover { background: #1D4ED8; }
+  .btn-export-word {
+    background: #2B6CB0; color: #FFF; border: none; padding: 8px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px;
+  }
+  .btn-export-word:hover { background: #1C3D5A; }
+
+  .charts-grid-top { display: grid; grid-template-columns: 1fr; margin: 20px 0; }
+  .charts-grid-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+  @media(max-width: 850px) { .charts-grid-bottom { grid-template-columns: 1fr; } }
+
+  .chart-box {
+    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px; position: relative; height: 300px;
+  }
+
+  .report-table{width:100%; border-collapse:collapse; margin-top:14px; font-size:13.5px; color:var(--paper2); min-width:300px;}
+  .report-table th, .report-table td{padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;}
+  .report-table th{color:var(--saffron); font-weight:600;}
+
+  footer{background:var(--ink); color:#A9AFA9; padding:20px 0; margin-top:40px; border-top:1px solid rgba(247,243,232,0.1);}
+  .foot-bottom{font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+</style>
+</head>
+<body>
+
+<!-- HEADER SECTION -->
+<header class="nav">
+  <div class="wrap nav-row">
+    <div class="brand">
+      <svg class="tickmark" viewBox="0 0 26 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 2H24V24L20 28L16 24L13 28L10 24L6 28L2 24V2Z" fill="#1F2523"/>
+        <line x1="6" y1="9" x2="20" y2="9" stroke="#F7F3E8" stroke-width="1.6"/>
+        <line x1="6" y1="14" x2="20" y2="14" stroke="#F7F3E8" stroke-width="1.6"/>
+        <line x1="6" y1="19" x2="14" y2="19" stroke="#F7F3E8" stroke-width="1.6"/>
+      </svg>
+      Bilkul
+    </div>
+
+    <!-- Navigation links -->
+    <nav class="nav-links" id="mainNav" style="display:none;">
+      <button class="nav-btn active" onclick="switchTab('billing')" id="nav-billing">01. Take Bills</button>
+      <button class="nav-btn" onclick="switchTab('menu')" id="nav-menu">02. Manage Menu</button>
+      <button class="nav-btn" onclick="switchTab('inventory')" id="nav-inventory">03. Inventory &amp; Stock</button>
+      <button class="nav-btn" onclick="switchTab('reports')" id="nav-reports">04. Sales Reports</button>
+    </nav>
+
+    <!-- User Authentication Status Header -->
+    <div id="userHeaderStatus" style="display:none;">
+      <div class="user-badge">
+        <span id="userEmailDisplay">user@example.com</span>
+        <button class="btn-logout" onclick="logoutUser()">Logout</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- LOGIN / REGISTER CONTAINER -->
+<div id="authContainer">
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" id="tabBtnLogin" onclick="switchAuthMode('login')">Login</button>
+      <button class="auth-tab-btn" id="tabBtnRegister" onclick="switchAuthMode('register')">Register</button>
+    </div>
+    <h2 id="authTitle">Welcome Back</h2>
+    <p id="authSubtitle">Sign in to access your cloud POS & inventory database.</p>
+    
+    <div class="form-field" style="margin-bottom:12px;">
+      <label>Email Address</label>
+      <input type="email" id="authEmail" placeholder="restaurant@example.com">
+    </div>
+    <div class="form-field" style="margin-bottom:20px;">
+      <label>Password</label>
+      <input type="password" id="authPassword" placeholder="••••••••">
+    </div>
+
+    <button class="btn-add" id="authSubmitBtn" onclick="handleAuthSubmit()" style="width:100%; height:42px; font-size:15px;">Login to POS</button>
+  </div>
+</div>
+
+<!-- MAIN APPLICATION BODY (AUTHENTICATED ONLY) -->
+<div id="appContainer" style="display:none;">
+
+  <section class="hero">
+    <div class="wrap">
+      <span class="free-badge">Cloud Syncing Active · Realtime Database</span>
+      <h1>Free Restaurant POS &amp; Live Analytics</h1>
+      <p class="lead">All changes to menu items, raw materials, stock adjustments, and bills are instantly synced to your database.</p>
+    </div>
+  </section>
+
+  <section class="wrap" style="padding-bottom: 40px;">
+
+    <!-- TAB 1: BILLING (POS) -->
+    <div class="tab-panel active" id="tab-billing">
+      <div class="app-grid">
+        <!-- MENU SELECTION -->
+        <div class="app-card">
+          <h3>
+            <span>Select Menu Items</span>
+            <small style="font-size:11.5px; font-weight:normal; color:#6B7370;">Click item to add</small>
+          </h3>
+          <div class="menu-grid" id="menuGrid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- BILL COUNTER -->
+        <div class="app-card">
+          <h3>Current Order Pad</h3>
+          <table class="bill-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody id="billItems">
+              <tr><td colspan="3" style="text-align:center; color:#888; padding:20px;">No items added yet. Click items on the left menu.</td></tr>
+            </tbody>
+          </table>
+
+          <!-- DISCOUNT SECTION -->
+          <div class="discount-box">
+            <label>Apply Discount:</label>
+            <input type="number" id="discountValue" value="0" min="0" placeholder="0" oninput="updateBillUI()">
+            <select id="discountType" onchange="updateBillUI()">
+              <option value="percent">% Off</option>
+              <option value="flat">₹ Flat</option>
+            </select>
+          </div>
+
+          <div class="bill-summary">
+            <div class="summary-row"><span>Subtotal</span><span id="subTotal">₹0.00</span></div>
+            <div class="summary-row discount"><span>Discount</span><span id="discountTotal">-₹0.00</span></div>
+            <div class="summary-row"><span>GST (5%)</span><span id="taxTotal">₹0.00</span></div>
+            <div class="summary-row total"><span>Total Amount</span><span id="grandTotal">₹0.00</span></div>
+          </div>
+
+          <div class="action-btns">
+            <button class="btn-action btn-clear" onclick="clearBill()">Clear Pad</button>
+            <button class="btn-action btn-pay" onclick="checkoutBill()">Take Bill &amp; Complete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: MANAGE MENU -->
+    <div class="tab-panel" id="tab-menu">
+      <div class="app-card" style="margin-bottom:20px;">
+        <h3>Add New Menu Item</h3>
+        <div class="form-group-grid">
+          <div class="form-field">
+            <label>Item Name</label>
+            <input type="text" id="newItemName" placeholder="e.g. Paneer Butter Masala">
+          </div>
+          <div class="form-field">
+            <label>Price (₹)</label>
+            <input type="number" id="newItemPrice" placeholder="260">
+          </div>
+        </div>
+
+        <!-- MULTI INGREDIENT RECIPE BUILDER -->
+        <div class="recipe-builder-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <label style="font-size:12.5px; font-weight:700; color:var(--teal-deep);">Recipe Ingredients (Multi-Select)</label>
+            <button class="btn-secondary" onclick="addIngredientRow()">+ Add Ingredient</button>
+          </div>
+          <div id="ingredientRowsContainer">
+            <!-- Dynamic Ingredient Rows inserted here -->
+          </div>
+        </div>
+
+        <button class="btn-add" onclick="addNewMenuItem()" style="width:100%; font-size:14px; height:40px;">+ Save Menu Item to Database</button>
+      </div>
+
+      <div class="app-card">
+        <h3>
+          <span>Edit or Remove Menu Items</span>
+          <small style="font-size:11.5px; font-weight:normal; color:#6B7370;">Price edits update immediately in POS</small>
+        </h3>
+        <table class="bill-table" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Recipe / Ingredients Link</th>
+              <th>Price (₹)</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="manageMenuBody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: INVENTORY & RAW MATERIAL TRACKING -->
+    <div class="tab-panel" id="tab-inventory">
+      <div class="app-grid" style="margin-bottom:20px;">
+        
+        <!-- STOCK ENTRY / INWARD RECEIVING -->
+        <div class="app-card">
+          <h3>Stock Entry (Inward Purchase)</h3>
+          <p style="font-size:12.5px; color:#6B7370; margin-bottom:12px;">Add newly purchased raw materials & cost price to calculate net sales/profits.</p>
+          <div class="stock-entry-grid">
+            <div class="form-field">
+              <label>Raw Material</label>
+              <select id="stockIngredientSelect">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Quantity Added</label>
+              <input type="number" step="0.1" id="stockQtyInput" placeholder="e.g. 5.0">
+            </div>
+            <div class="form-field">
+              <label>Cost Price / Unit (₹)</label>
+              <input type="number" step="0.5" id="stockPriceInput" placeholder="e.g. 220">
+            </div>
+            <button class="btn-add" onclick="addStockEntry()">+ Add Stock</button>
+          </div>
+        </div>
+
+        <!-- CREATE NEW INGREDIENT -->
+        <div class="app-card">
+          <h3>Register New Ingredient</h3>
+          <p style="font-size:12.5px; color:#6B7370; margin-bottom:12px;">Create a new raw material item to track.</p>
+          <div class="stock-entry-grid" style="grid-template-columns: 1fr 1fr auto;">
+            <div class="form-field">
+              <label>Material Name</label>
+              <input type="text" id="newIngName" placeholder="e.g. Butter">
+            </div>
+            <div class="form-field">
+              <label>Unit (kg, L, Units)</label>
+              <input type="text" id="newIngUnit" placeholder="kg">
+            </div>
+            <button class="btn-add" onclick="registerNewIngredient()">Create</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MANUAL ADJUST STOCK -->
+      <div class="app-card" style="margin-bottom:20px;">
+        <h3>Adjust Raw Material Stock (Wastage / Audit Corrections)</h3>
+        <p style="font-size:12.5px; color:#6B7370; margin-bottom:12px;">Manually increase or decrease current stock for physical inventory audits, wastage, or damage.</p>
+        <div class="adjust-stock-grid">
+          <div class="form-field">
+            <label>Raw Material</label>
+            <select id="adjustIngredientSelect">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Action</label>
+            <select id="adjustActionType">
+              <option value="add">Add Stock (+)</option>
+              <option value="subtract">Subtract / Deduct (-)</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Quantity</label>
+            <input type="number" step="0.01" id="adjustQtyInput" placeholder="e.g. 0.5">
+          </div>
+          <div class="form-field">
+            <label>Reason / Note</label>
+            <input type="text" id="adjustReasonInput" placeholder="e.g. Spoilage / Stock Audit">
+          </div>
+          <button class="btn-adjust" onclick="adjustStockEntry()">Apply Adjustment</button>
+        </div>
+      </div>
+
+      <!-- CURRENT INVENTORY SUMMARY -->
+      <div class="app-card" style="margin-bottom:20px;">
+        <h3>
+          <span>Live Raw Material Stock Levels &amp; Costing</span>
+          <small style="font-size:11.5px; font-weight:normal; color:#6B7370;">Auto-deducts on sales</small>
+        </h3>
+        <table class="bill-table" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Raw Material</th>
+              <th>Current Level</th>
+              <th>Avg Cost / Unit</th>
+              <th>Total Consumed</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryBody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- USAGE LOGS -->
+      <div class="app-card">
+        <h3>Raw Material Usage &amp; Activity Log</h3>
+        <table class="bill-table" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Ingredient</th>
+              <th>Qty Change</th>
+              <th>Reason / Type</th>
+            </tr>
+          </thead>
+          <tbody id="stockLogBody">
+            <tr><td colspan="4" style="text-align:center; color:#888; padding:16px;">No inventory activity recorded yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: SALES REPORTS -->
+    <div class="tab-panel" id="tab-reports">
+      <div class="reports-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3>Live Sales &amp; Profit Reports</h3>
+            <p style="font-size:13px; color:#CFE0DD; margin-top:4px;">Real-time breakdown comparing Gross Sales (Total Revenue), Discounts Given, Net Sales (Net Profit), and Orders grouped in 30-minute intervals.</p>
+          </div>
+
+          <div class="export-bar">
+            <button onclick="exportSalesReportToExcel()" class="btn-export-excel">📊 Export Excel (.xlsx)</button>
+            <button onclick="exportSalesReportToWord()" class="btn-export-word">📄 Export Word (.docx)</button>
+          </div>
+        </div>
+        
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span>Total Orders</span>
+            <b id="repOrders">0</b>
+          </div>
+          <div class="metric-card">
+            <span>Gross Sales (Revenue)</span>
+            <b id="repRevenue">₹0.00</b>
+          </div>
+          <div class="metric-card">
+            <span>Discounts Given</span>
+            <b id="repDiscount" style="color:var(--chili);">₹0.00</b>
+          </div>
+          <div class="metric-card">
+            <span>Total Raw Material Cost</span>
+            <b id="repCogs" style="color:#E53E3E;">₹0.00</b>
+          </div>
+          <div class="metric-card">
+            <span>Net Sales (Profit)</span>
+            <b id="repNetSales" style="color:#48BB78;">₹0.00</b>
+          </div>
+        </div>
+
+        <!-- CHART 1: ORDERS OVER TIME -->
+        <div class="charts-grid-top">
+          <div class="chart-box">
+            <h4 style="margin-bottom:10px; font-size:15px; color:var(--paper2);">Orders Count Over Time (30-Min Intervals)</h4>
+            <canvas id="ordersChart"></canvas>
+          </div>
+        </div>
+
+        <!-- CHARTS 2 & 3: GROSS vs NET SALES -->
+        <div class="charts-grid-bottom">
+          <div class="chart-box">
+            <h4 style="margin-bottom:10px; font-size:15px; color:var(--paper2);">Gross Sales Over Time (₹)</h4>
+            <canvas id="grossSalesChart"></canvas>
+          </div>
+          <div class="chart-box">
+            <h4 style="margin-bottom:10px; font-size:15px; color:var(--paper2);">Net Sales / Profit Over Time (₹)</h4>
+            <canvas id="netSalesChart"></canvas>
+          </div>
+        </div>
+
+        <h4 style="margin-top:20px; font-size:16px; color:var(--paper2);">Sales Breakdown by Item</h4>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Units Sold</th>
+              <th>Gross Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="salesBreakdown">
+            <tr><td colspan="3" style="color:#A9AFA9;">No sales recorded yet. Take bills in POS to generate reports.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-bottom">
+      <span>© 2026 Bilkul POS. Free billing, inventory &amp; reporting database for restaurants.</span>
+      <span>No hidden charges. Fully functional.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // 1. FIREBASE CONFIGURATION
+  // REPLACE THE KEYS BELOW WITH YOUR FIREBASE PROJECT CONFIGURATION DETAILS
+  const firebaseConfig = {
+    apiKey: "AIzaSyCziIy3OMaMT-s-d65q63bBfptE4MLC6rk",
+    authDomain: "bilkul-95cf2.firebaseapp.com",
+    databaseURL: "https://bilkul-95cf2-default-rtdb.firebaseio.com", // Replace with your exact Realtime Database URL if different
+    projectId: "bilkul-95cf2",
+    storageBucket: "bilkul-95cf2.firebasestorage.app",
+    messagingSenderId: "827545459369",
+    appId: "1:827545459369:web:3e86b9c800168a35b2e7b8",
+    measurementId: "G-564X1M66DZ"
+  };
+
+  // Initialize Firebase & Services
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.database();
+  const analytics = firebase.analytics();
+
+  // App Global State
+  let currentUser = null;
+  let currentAuthMode = 'login'; // 'login' or 'register'
+
+  let menu = [];
+  let inventory = {};
+  let stockLogs = [];
+  let currentBill = {};
+  let salesData = {
+    totalOrders: 0,
+    grossSales: 0,
+    totalDiscount: 0,
+    totalTax: 0,
+    cogs: 0,
+    netSales: 0,
+    itemsSold: {}
+  };
+
+  let orderTimestamps = [];
+  let timeSeriesData = {
+    timestamps: [],
+    grossSalesList: [],
+    netSalesList: []
+  };
+
+  let ordersChartInstance = null;
+  let grossChartInstance = null;
+  let netChartInstance = null;
+
+  // Initializing Default Data Structure for new users
+  const defaultMenu = [
+    { id: 1, name: "Paneer Tikka", price: 230, ingredients: [{ name: "Paneer", usage: 0.2 }, { name: "Butter", usage: 0.05 }] },
+    { id: 2, name: "Butter Naan", price: 70, ingredients: [{ name: "Flour", usage: 0.1 }, { name: "Butter", usage: 0.02 }] },
+    { id: 3, name: "Masala Chai", price: 60, ingredients: [{ name: "Milk", usage: 0.15 }] }
+  ];
+
+  const defaultInventory = {
+    "Paneer": { stock: 5.0, totalConsumed: 0.0, unit: "kg", unitCost: 240 },
+    "Flour": { stock: 10.0, totalConsumed: 0.0, unit: "kg", unitCost: 45 },
+    "Milk": { stock: 8.0, totalConsumed: 0.0, unit: "L", unitCost: 60 },
+    "Butter": { stock: 4.0, totalConsumed: 0.0, unit: "kg", unitCost: 480 }
+  };
+
+  // 2. AUTHENTICATION MANAGEMENT
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('authContainer').style.display = 'none';
+      document.getElementById('appContainer').style.display = 'block';
+      document.getElementById('mainNav').style.display = 'flex';
+      document.getElementById('userHeaderStatus').style.display = 'block';
+      document.getElementById('userEmailDisplay').innerText = user.email;
+
+      // Attach realtime listeners to user database node
+      attachDatabaseListeners(user.uid);
+      initCharts();
+    } else {
+      currentUser = null;
+      document.getElementById('authContainer').style.display = 'flex';
+      document.getElementById('appContainer').style.display = 'none';
+      document.getElementById('mainNav').style.display = 'none';
+      document.getElementById('userHeaderStatus').style.display = 'none';
+    }
+  });
+
+  function switchAuthMode(mode) {
+    currentAuthMode = mode;
+    const tabLogin = document.getElementById('tabBtnLogin');
+    const tabRegister = document.getElementById('tabBtnRegister');
+    const title = document.getElementById('authTitle');
+    const subtitle = document.getElementById('authSubtitle');
+    const btn = document.getElementById('authSubmitBtn');
+
+    if (mode === 'login') {
+      tabLogin.classList.add('active');
+      tabRegister.classList.remove('active');
+      title.innerText = "Welcome Back";
+      subtitle.innerText = "Sign in to access your cloud POS & inventory database.";
+      btn.innerText = "Login to POS";
+    } else {
+      tabRegister.classList.add('active');
+      tabLogin.classList.remove('active');
+      title.innerText = "Create Account";
+      subtitle.innerText = "Register a new store account to save your sales and inventory data.";
+      btn.innerText = "Register & Create Store";
+    }
+  }
+
+  function handleAuthSubmit() {
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+
+    if (!email || !password) {
+      alert("Please enter both email and password.");
+      return;
+    }
+
+    if (currentAuthMode === 'login') {
+      auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+          analytics.logEvent('login', { method: 'email' });
+        })
+        .catch(err => alert("Login Error: " + err.message));
+    } else {
+      auth.createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          analytics.logEvent('sign_up', { method: 'email' });
+          // Initialize default database records for newly registered store
+          const uid = userCredential.user.uid;
+          db.ref(`users/${uid}/menu`).set(defaultMenu);
+          db.ref(`users/${uid}/inventory`).set(defaultInventory);
+        })
+        .catch(err => alert("Registration Error: " + err.message));
+    }
+  }
+
+  function logoutUser() {
+    auth.signOut();
+  }
+
+  // 3. REALTIME DATABASE LISTENERS
+  function attachDatabaseListeners(uid) {
+    const userRef = db.ref(`users/${uid}`);
+
+    // Listen for Menu changes
+    userRef.child('menu').on('value', snapshot => {
+      menu = snapshot.val() || [];
+      renderMenu();
+      renderManageMenu();
+    });
+
+    // Listen for Inventory changes
+    userRef.child('inventory').on('value', snapshot => {
+      inventory = snapshot.val() || {};
+      renderInventory();
+      renderManageMenu();
+    });
+
+    // Listen for Stock Activity Logs changes
+    userRef.child('stockLogs').on('value', snapshot => {
+      const logsObj = snapshot.val() || {};
+      stockLogs = Object.values(logsObj).reverse();
+      renderStockLogs();
+    });
+
+    // Listen for Sales Reports data
+    userRef.child('salesData').on('value', snapshot => {
+      const val = snapshot.val();
+      if (val) {
+        salesData = {
+          totalOrders: val.totalOrders || 0,
+          grossSales: val.grossSales || 0,
+          totalDiscount: val.totalDiscount || 0,
+          totalTax: val.totalTax || 0,
+          cogs: val.cogs || 0,
+          netSales: val.netSales || 0,
+          itemsSold: val.itemsSold || {}
+        };
+      }
+      renderReports();
+    });
+
+    // Listen for Time Series Sales Logs
+    userRef.child('timeSeriesData').on('value', snapshot => {
+      const val = snapshot.val();
+      if (val) {
+        timeSeriesData = {
+          timestamps: val.timestamps || [],
+          grossSalesList: val.grossSalesList || [],
+          netSalesList: val.netSalesList || []
+        };
+      }
+      renderReports();
+    });
+
+    // Listen for raw Order Timestamps
+    userRef.child('orderTimestamps').on('value', snapshot => {
+      const val = snapshot.val() || [];
+      orderTimestamps = val.map(tsStr => new Date(tsStr));
+      renderReports();
+    });
+  }
+
+  // Helper function to save UI changes to Firebase Realtime Database
+  function saveToDb(path, data) {
+    if (!currentUser) return;
+    db.ref(`users/${currentUser.uid}/${path}`).set(data);
+  }
+
+  function pushToDbList(path, data) {
+    if (!currentUser) return;
+    db.ref(`users/${currentUser.uid}/${path}`).push(data);
+  }
+
+  // 4. UI TAB NAVIGATION
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+    document.getElementById(`nav-${tabName}`).classList.add('active');
+
+    analytics.logEvent('page_view', { page_title: tabName });
+  }
+
+  function get30MinSlotLabel(date) {
+    let minutes = date.getMinutes();
+    let roundedMinutes = minutes < 30 ? '00' : '30';
+    let hours = date.getHours();
+    let ampm = hours >= 12 ? 'PM' : 'AM';
+    let formattedHours = hours % 12 || 12;
+    return `${formattedHours}:${roundedMinutes} ${ampm}`;
+  }
+
+  // 5. MENU MANAGEMENT & DATABASE ACTIONS
+  function renderMenu() {
+    const grid = document.getElementById('menuGrid');
+    if (!grid) return;
+    grid.innerHTML = menu.map(item => `
+      <button class="menu-btn" onclick="addToBill(${item.id})">
+        <span class="name">${item.name}</span>
+        <span class="price">₹${item.price}</span>
+      </button>
+    `).join('');
+  }
+
+  function addIngredientRow(selectedIng = '', usageVal = '') {
+    const container = document.getElementById('ingredientRowsContainer');
+    const rowId = 'ingRow_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+    const ingOptions = Object.keys(inventory).map(ing => `
+      <option value="${ing}" ${ing === selectedIng ? 'selected' : ''}>${ing}</option>
+    `).join('');
+
+    const rowHtml = `
+      <div class="ingredient-row" id="${rowId}">
+        <div class="form-field">
+          <label>Ingredient</label>
+          <select class="recipe-ing-select">
+            ${ingOptions}
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Usage per Plate</label>
+          <input type="number" step="0.01" class="recipe-ing-usage" placeholder="e.g. 0.15" value="${usageVal}">
+        </div>
+        <button class="btn-remove" style="height:37px;" onclick="removeIngredientRow('${rowId}')">Remove</button>
+      </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', rowHtml);
+  }
+
+  function removeIngredientRow(rowId) {
+    const container = document.getElementById('ingredientRowsContainer');
+    if (container.children.length <= 1) {
+      alert("At least one ingredient row is required for a recipe.");
+      return;
+    }
+    const row = document.getElementById(rowId);
+    if (row) row.remove();
+  }
+
+  function resetRecipeForm() {
+    document.getElementById('ingredientRowsContainer').innerHTML = '';
+    addIngredientRow(); 
+  }
+
+  function renderManageMenu() {
+    const tbody = document.getElementById('manageMenuBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = menu.map(item => {
+      const ingListStr = (item.ingredients || []).map(i => {
+        const unit = inventory[i.name] ? inventory[i.name].unit : '';
+        return `<b>${i.name}</b> (${i.usage} ${unit})`;
+      }).join(', ');
+
+      return `
+        <tr>
+          <td><b>${item.name}</b></td>
+          <td style="font-size:12.5px; color:#3A423F;">${ingListStr}</td>
+          <td>
+            <input type="number" class="edit-price-input" value="${item.price}" onchange="updatePrice(${item.id}, this.value)">
+          </td>
+          <td>
+            <button class="btn-remove" onclick="removeMenuItem(${item.id})">Remove</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const stockSelect = document.getElementById('stockIngredientSelect');
+    const adjustSelect = document.getElementById('adjustIngredientSelect');
+    
+    const optionsHtml = Object.keys(inventory).map(ing => `<option value="${ing}">${ing}</option>`).join('');
+    if(stockSelect) stockSelect.innerHTML = optionsHtml;
+    if(adjustSelect) adjustSelect.innerHTML = optionsHtml;
+  }
+
+  function addNewMenuItem() {
+    const nameInput = document.getElementById('newItemName');
+    const priceInput = document.getElementById('newItemPrice');
+
+    const name = nameInput.value.trim();
+    const price = parseFloat(priceInput.value);
+
+    if (!name || isNaN(price) || price <= 0) {
+      alert("Please enter a valid item name and price.");
+      return;
+    }
+
+    const rows = document.querySelectorAll('.ingredient-row');
+    let ingredients = [];
+
+    rows.forEach(row => {
+      const ingName = row.querySelector('.recipe-ing-select').value;
+      const usage = parseFloat(row.querySelector('.recipe-ing-usage').value);
+
+      if (ingName && !isNaN(usage) && usage > 0) {
+        ingredients.push({ name: ingName, usage: usage });
+      }
+    });
+
+    if (ingredients.length === 0) {
+      alert("Please enter a valid usage quantity for at least one ingredient.");
+      return;
+    }
+
+    const newId = menu.length > 0 ? Math.max(...menu.map(m => m.id)) + 1 : 1;
+    menu.push({ id: newId, name, price, ingredients });
+
+    saveToDb('menu', menu);
+
+    nameInput.value = '';
+    priceInput.value = '';
+    resetRecipeForm();
+    alert(`Menu item "${name}" saved to database!`);
+  }
+
+  function updatePrice(id, newPrice) {
+    const price = parseFloat(newPrice);
+    if (isNaN(price) || price < 0) return;
+    const item = menu.find(m => m.id === id);
+    if (item) {
+      item.price = price;
+      saveToDb('menu', menu);
+      updateBillUI();
+    }
+  }
+
+  function removeMenuItem(id) {
+    menu = menu.filter(m => m.id !== id);
+    delete currentBill[id];
+    saveToDb('menu', menu);
+    updateBillUI();
+  }
+
+  // 6. INVENTORY MANAGEMENT & DATABASE ACTIONS
+  function addStockEntry() {
+    const ingName = document.getElementById('stockIngredientSelect').value;
+    const qtyInput = document.getElementById('stockQtyInput');
+    const priceInput = document.getElementById('stockPriceInput');
+
+    const qty = parseFloat(qtyInput.value);
+    const unitPrice = parseFloat(priceInput.value) || inventory[ingName].unitCost || 0;
+
+    if (isNaN(qty) || qty <= 0) {
+      alert("Please enter a valid quantity.");
+      return;
+    }
+
+    if (inventory[ingName]) {
+      const currentStock = inventory[ingName].stock;
+      const oldCost = inventory[ingName].unitCost || 0;
+      const newStock = currentStock + qty;
+      
+      const weightedAvgCost = newStock > 0 
+        ? ((currentStock * oldCost) + (qty * unitPrice)) / newStock 
+        : unitPrice;
+
+      inventory[ingName].stock = newStock;
+      inventory[ingName].unitCost = weightedAvgCost;
+
+      saveToDb('inventory', inventory);
+      logStockActivity(ingName, `+${qty.toFixed(2)} ${inventory[ingName].unit}`, `Inward Stock @ ₹${unitPrice}/unit`);
+
+      qtyInput.value = '';
+      priceInput.value = '';
+      alert(`Updated stock in database for ${ingName}!`);
+    }
+  }
+
+  function adjustStockEntry() {
+    const ingName = document.getElementById('adjustIngredientSelect').value;
+    const action = document.getElementById('adjustActionType').value;
+    const qtyInput = document.getElementById('adjustQtyInput');
+    const reasonInput = document.getElementById('adjustReasonInput');
+
+    const qty = parseFloat(qtyInput.value);
+    const reason = reasonInput.value.trim() || (action === 'add' ? 'Manual Addition' : 'Manual Deduction/Wastage');
+
+    if (isNaN(qty) || qty <= 0) {
+      alert("Please enter a valid quantity to adjust.");
+      return;
+    }
+
+    if (inventory[ingName]) {
+      if (action === 'subtract') {
+        inventory[ingName].stock = Math.max(0, inventory[ingName].stock - qty);
+        logStockActivity(ingName, `-${qty.toFixed(2)} ${inventory[ingName].unit}`, `Adjust: ${reason}`);
+      } else {
+        inventory[ingName].stock += qty;
+        logStockActivity(ingName, `+${qty.toFixed(2)} ${inventory[ingName].unit}`, `Adjust: ${reason}`);
+      }
+
+      saveToDb('inventory', inventory);
+      qtyInput.value = '';
+      reasonInput.value = '';
+      alert(`Stock adjustment stored in database for ${ingName}!`);
+    }
+  }
+
+  function registerNewIngredient() {
+    const nameInput = document.getElementById('newIngName');
+    const unitInput = document.getElementById('newIngUnit');
+
+    const name = nameInput.value.trim();
+    const unit = unitInput.value.trim() || 'kg';
+
+    if (!name) {
+      alert("Please enter an ingredient name.");
+      return;
+    }
+
+    if (inventory[name]) {
+      alert("Ingredient already exists!");
+      return;
+    }
+
+    inventory[name] = { stock: 0.0, totalConsumed: 0.0, unit: unit, unitCost: 0 };
+    saveToDb('inventory', inventory);
+    logStockActivity(name, `0.00 ${unit}`, 'Raw Material Created');
+    
+    nameInput.value = '';
+    unitInput.value = '';
+  }
+
+  function renderInventory() {
+    const tbody = document.getElementById('inventoryBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = Object.keys(inventory).map(key => {
+      const item = inventory[key];
+      const isLow = item.stock < 1.5;
+      return `
+        <tr>
+          <td><b>${key}</b></td>
+          <td class="mono">${item.stock.toFixed(2)} ${item.unit}</td>
+          <td class="mono" style="color:var(--teal-deep);">₹${(item.unitCost || 0).toFixed(2)} / ${item.unit}</td>
+          <td class="mono" style="color:#888;">${(item.totalConsumed || 0).toFixed(2)} ${item.unit}</td>
+          <td><span style="color:${isLow ? 'var(--chili)' : 'var(--teal)'}; font-weight:600; font-size:11.5px;">${isLow ? 'LOW STOCK' : 'OK'}</span></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function logStockActivity(ingredient, change, reason) {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    pushToDbList('stockLogs', { time, ingredient, change, reason });
+  }
+
+  function renderStockLogs() {
+    const tbody = document.getElementById('stockLogBody');
+    if (!tbody) return;
+
+    if (stockLogs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888; padding:16px;">No inventory activity recorded yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = stockLogs.map(log => `
+      <tr>
+        <td class="mono" style="font-size:11.5px;">${log.time}</td>
+        <td><b>${log.ingredient}</b></td>
+        <td class="mono">${log.change}</td>
+        <td style="font-size:12.5px; color:#6B7370;">${log.reason}</td>
+      </tr>
+    `).join('');
+  }
+
+  // 7. POS CHECKOUT & DATABASE TRANSACTION LOGIC
+  function addToBill(id) {
+    const item = menu.find(m => m.id === id);
+    if (!item) return;
+    if (currentBill[id]) {
+      currentBill[id].qty++;
+    } else {
+      currentBill[id] = { ...item, qty: 1 };
+    }
+    updateBillUI();
+  }
+
+  function changeQty(id, delta) {
+    if (currentBill[id]) {
+      currentBill[id].qty += delta;
+      if (currentBill[id].qty <= 0) {
+        delete currentBill[id];
+      }
+    }
+    updateBillUI();
+  }
+
+  function updateBillUI() {
+    const tbody = document.getElementById('billItems');
+    if (!tbody) return;
+
+    const items = Object.values(currentBill);
+
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888; padding:20px;">No items added yet. Click items on the left menu.</td></tr>';
+      document.getElementById('subTotal').innerText = '₹0.00';
+      document.getElementById('discountTotal').innerText = '-₹0.00';
+      document.getElementById('taxTotal').innerText = '₹0.00';
+      document.getElementById('grandTotal').innerText = '₹0.00';
+      return;
+    }
+
+    let subtotal = 0;
+    tbody.innerHTML = items.map(item => {
+      const itemTotal = item.price * item.qty;
+      subtotal += itemTotal;
+      return `
+        <tr>
+          <td><b>${item.name}</b></td>
+          <td>
+            <div class="qty-controls">
+              <button class="qty-btn" onclick="changeQty(${item.id}, -1)">-</button>
+              <span class="mono">${item.qty}</span>
+              <button class="qty-btn" onclick="changeQty(${item.id}, 1)">+</button>
+            </div>
+          </td>
+          <td class="mono">₹${itemTotal}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const discVal = parseFloat(document.getElementById('discountValue').value) || 0;
+    const discType = document.getElementById('discountType').value;
+    let discountAmount = discType === 'percent' ? (subtotal * discVal) / 100 : discVal;
+    if (discountAmount > subtotal) discountAmount = subtotal;
+
+    const discountedSubtotal = subtotal - discountAmount;
+    const tax = discountedSubtotal * 0.05;
+    const grandTotal = discountedSubtotal + tax;
+
+    document.getElementById('subTotal').innerText = `₹${subtotal.toFixed(2)}`;
+    document.getElementById('discountTotal').innerText = `-₹${discountAmount.toFixed(2)}`;
+    document.getElementById('taxTotal').innerText = `₹${tax.toFixed(2)}`;
+    document.getElementById('grandTotal').innerText = `₹${grandTotal.toFixed(2)}`;
+  }
+
+  function clearBill() {
+    currentBill = {};
+    document.getElementById('discountValue').value = 0;
+    updateBillUI();
+  }
+
+  function checkoutBill() {
+    const items = Object.values(currentBill);
+    if (items.length === 0) {
+      alert("Please add items to take a bill.");
+      return;
+    }
+
+    const now = new Date();
+    let subtotal = 0;
+    let orderCogs = 0;
+
+    items.forEach(item => {
+      subtotal += item.price * item.qty;
+
+      if (item.ingredients && Array.isArray(item.ingredients)) {
+        item.ingredients.forEach(ing => {
+          if (inventory[ing.name]) {
+            const totalDeductions = ing.usage * item.qty;
+            inventory[ing.name].stock = Math.max(0, inventory[ing.name].stock - totalDeductions);
+            inventory[ing.name].totalConsumed = (inventory[ing.name].totalConsumed || 0) + totalDeductions;
+
+            const costForThisIng = totalDeductions * (inventory[ing.name].unitCost || 0);
+            orderCogs += costForThisIng;
+
+            logStockActivity(
+              ing.name, 
+              `-${totalDeductions.toFixed(2)} ${inventory[ing.name].unit}`, 
+              `Sale: ${item.name} (x${item.qty})`
+            );
+          }
+        });
+      }
+
+      if (!salesData.itemsSold[item.name]) {
+        salesData.itemsSold[item.name] = { qty: 0, revenue: 0 };
+      }
+      salesData.itemsSold[item.name].qty += item.qty;
+      salesData.itemsSold[item.name].revenue += item.price * item.qty;
+    });
+
+    const discVal = parseFloat(document.getElementById('discountValue').value) || 0;
+    const discType = document.getElementById('discountType').value;
+    let discountAmount = discType === 'percent' ? (subtotal * discVal) / 100 : discVal;
+    if (discountAmount > subtotal) discountAmount = subtotal;
+
+    const discountedSubtotal = subtotal - discountAmount;
+    const tax = discountedSubtotal * 0.05;
+    const grossTotal = discountedSubtotal + tax;
+    const orderNetSale = discountedSubtotal - orderCogs;
+
+    salesData.totalOrders++;
+    salesData.grossSales += grossTotal;
+    salesData.totalDiscount += discountAmount;
+    salesData.totalTax += tax;
+    salesData.cogs += orderCogs;
+    salesData.netSales += orderNetSale;
+
+    orderTimestamps.push(now);
+
+    const timeNow = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    timeSeriesData.timestamps.push(timeNow);
+    timeSeriesData.grossSalesList.push(salesData.grossSales);
+    timeSeriesData.netSalesList.push(salesData.netSales);
+
+    // Track checkout purchase event in Firebase Analytics
+    analytics.logEvent('purchase', {
+      value: grossTotal,
+      currency: 'INR',
+      tax: tax,
+      items: items.map(i => ({ item_id: String(i.id), item_name: i.name, price: i.price, quantity: i.qty }))
+    });
+
+    // Save updated state variables to Firebase Realtime Database
+    saveToDb('inventory', inventory);
+    saveToDb('salesData', salesData);
+    saveToDb('timeSeriesData', timeSeriesData);
+    saveToDb('orderTimestamps', orderTimestamps.map(d => d.toISOString()));
+
+    clearBill();
+    alert(`Bill completed & stored in database!\nGross Total: ₹${grossTotal.toFixed(2)}\nNet Profit: ₹${orderNetSale.toFixed(2)}`);
+  }
+
+  // 8. CHARTS & REPORTS INITIALIZATION
+  function initCharts() {
+    const ctxOrders = document.getElementById('ordersChart').getContext('2d');
+    ordersChartInstance = new Chart(ctxOrders, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Orders Processed (per 30-Min Interval)',
+          data: [],
+          borderColor: '#4FD1C5',
+          backgroundColor: 'rgba(79, 209, 197, 0.15)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#CFE0DD', precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
+        },
+        plugins: { legend: { labels: { color: '#F7F3E8' } } }
+      }
+    });
+
+    const ctxGross = document.getElementById('grossSalesChart').getContext('2d');
+    grossChartInstance = new Chart(ctxGross, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Gross Revenue (₹)',
+          data: [],
+          borderColor: '#E8A33D',
+          backgroundColor: 'rgba(232, 163, 61, 0.15)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        plugins: { legend: { labels: { color: '#F7F3E8' } } }
+      }
+    });
+
+    const ctxNet = document.getElementById('netSalesChart').getContext('2d');
+    netChartInstance = new Chart(ctxNet, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Net Sales / Profit (₹)',
+          data: [],
+          borderColor: '#38A169',
+          backgroundColor: 'rgba(56, 161, 105, 0.15)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        plugins: { legend: { labels: { color: '#F7F3E8' } } }
+      }
+    });
+  }
+
+  function renderReports() {
+    document.getElementById('repOrders').innerText = salesData.totalOrders;
+    document.getElementById('repRevenue').innerText = `₹${salesData.grossSales.toFixed(2)}`;
+    document.getElementById('repDiscount').innerText = `₹${salesData.totalDiscount.toFixed(2)}`;
+    document.getElementById('repCogs').innerText = `₹${salesData.cogs.toFixed(2)}`;
+    document.getElementById('repNetSales').innerText = `₹${salesData.netSales.toFixed(2)}`;
+
+    const tbody = document.getElementById('salesBreakdown');
+    if (!tbody) return;
+
+    const itemNames = Object.keys(salesData.itemsSold || {});
+
+    if (itemNames.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="color:#A9AFA9;">No sales recorded yet. Take bills in POS to generate reports.</td></tr>';
+    } else {
+      tbody.innerHTML = itemNames.map(itemName => {
+        const data = salesData.itemsSold[itemName];
+        return `
+          <tr>
+            <td>${itemName}</td>
+            <td class="mono">${data.qty}</td>
+            <td class="mono">₹${data.revenue.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    let intervalCounts = {};
+    orderTimestamps.forEach(ts => {
+      let slot = get30MinSlotLabel(ts);
+      intervalCounts[slot] = (intervalCounts[slot] || 0) + 1;
+    });
+
+    let order30MinLabels = Object.keys(intervalCounts);
+    let order30MinValues = Object.values(intervalCounts);
+
+    if (ordersChartInstance) {
+      ordersChartInstance.data.labels = order30MinLabels;
+      ordersChartInstance.data.datasets[0].data = order30MinValues;
+      ordersChartInstance.update();
+    }
+
+    if (grossChartInstance && netChartInstance) {
+      grossChartInstance.data.labels = timeSeriesData.timestamps;
+      grossChartInstance.data.datasets[0].data = timeSeriesData.grossSalesList;
+      grossChartInstance.update();
+
+      netChartInstance.data.labels = timeSeriesData.timestamps;
+      netChartInstance.data.datasets[0].data = timeSeriesData.netSalesList;
+      netChartInstance.update();
+    }
+  }
+
+  // 9. EXPORT REPORT FUNCTIONS
+  function exportSalesReportToExcel() {
+    const itemNames = Object.keys(salesData.itemsSold || {});
+    
+    const summaryData = [
+      { Metric: "Total Orders", Value: salesData.totalOrders },
+      { Metric: "Gross Revenue (₹)", Value: salesData.grossSales.toFixed(2) },
+      { Metric: "Discounts Given (₹)", Value: salesData.totalDiscount.toFixed(2) },
+      { Metric: "Raw Material COGS (₹)", Value: salesData.cogs.toFixed(2) },
+      { Metric: "Net Sales / Profit (₹)", Value: salesData.netSales.toFixed(2) }
+    ];
+
+    const breakdownData = itemNames.length > 0 
+      ? itemNames.map(name => ({
+          "Item Name": name,
+          "Units Sold": salesData.itemsSold[name].qty,
+          "Gross Revenue (₹)": salesData.itemsSold[name].revenue.toFixed(2)
+        }))
+      : [{ "Item Name": "No Sales Recorded", "Units Sold": 0, "Gross Revenue (₹)": "0.00" }];
+
+    const workbook = XLSX.utils.book_new();
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+    const breakdownSheet = XLSX.utils.json_to_sheet(breakdownData);
+
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary Metrics");
+    XLSX.utils.book_append_sheet(workbook, breakdownSheet, "Item Breakdown");
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `Bilkul_Sales_Report_${dateStr}.xlsx`);
+  }
+
+  function exportSalesReportToWord() {
+    const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, HeadingLevel, AlignmentType } = docx;
+
+    const itemNames = Object.keys(salesData.itemsSold || {});
+
+    const summaryRows = [
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Metric", bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Value", bold: true })] })] })
+        ]
+      }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Total Orders")] }), new TableCell({ children: [new Paragraph(String(salesData.totalOrders))] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Gross Revenue")] }), new TableCell({ children: [new Paragraph(`₹${salesData.grossSales.toFixed(2)}`)] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Discounts Given")] }), new TableCell({ children: [new Paragraph(`₹${salesData.totalDiscount.toFixed(2)}`)] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Total Raw Material Cost")] }), new TableCell({ children: [new Paragraph(`₹${salesData.cogs.toFixed(2)}`)] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Net Sales (Profit)")] }), new TableCell({ children: [new Paragraph(`₹${salesData.netSales.toFixed(2)}`)] })] })
+    ];
+
+    const breakdownRows = [
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Item Name", bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Units Sold", bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Gross Revenue (₹)", bold: true })] })] })
+        ]
+      })
+    ];
+
+    if (itemNames.length === 0) {
+      breakdownRows.push(new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph("No sales recorded yet")] }),
+          new TableCell({ children: [new Paragraph("0")] }),
+          new TableCell({ children: [new Paragraph("0.00")] })
+        ]
+      }));
+    } else {
+      itemNames.forEach(name => {
+        breakdownRows.push(new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph(name)] }),
+            new TableCell({ children: [new Paragraph(String(salesData.itemsSold[name].qty))] }),
+            new TableCell({ children: [new Paragraph(`₹${salesData.itemsSold[name].revenue.toFixed(2)}`)] })
+          ]
+        }));
+      });
+    }
+
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            text: "Bilkul POS - Sales & Profit Report",
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER
+          }),
+          new Paragraph({
+            text: `Generated Date: ${new Date().toLocaleString()}`,
+            alignment: AlignmentType.CENTER,
+            space: { after: 300 }
+          }),
+          new Paragraph({ text: "Summary Metrics", heading: HeadingLevel.HEADING_2, space: { after: 150 } }),
+          new Table({
+            rows: summaryRows,
+            width: { size: 100, type: WidthType.PERCENTAGE }
+          }),
+          new Paragraph({ text: "Item-Wise Sales Breakdown", heading: HeadingLevel.HEADING_2, space: { before: 300, after: 150 } }),
+          new Table({
+            rows: breakdownRows,
+            width: { size: 100, type: WidthType.PERCENTAGE }
+          })
+        ]
+      }]
+    });
+
+    Packer.toBlob(doc).then(blob => {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      saveAs(blob, `Bilkul_Sales_Report_${dateStr}.docx`);
+    });
+  }
+
+  // Initializing default state for recipe form
+  resetRecipeForm();
+</script>
+
+</body>
+</html>
