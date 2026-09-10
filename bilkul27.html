@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bilkul — Restaurant POS & Live Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Export Libraries: SheetJS for Excel, docx.js + FileSaver for Word -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+<!-- Firebase SDKs (v9 Modular Compat Mode for Browser Script Tag Usage) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics-compat.js"></script>
+
+<style>
+  :root{
+    --ink:#1F2523;
+    --paper:#F7F3E8;
+    --paper2:#FBF8F0;
+    --saffron:#E8A33D;
+    --saffron-deep:#C9832A;
+    --teal:#1D4E4A;
+    --teal-deep:#153A37;
+    --chili:#C1442E;
+    --line:#C9CDBF;
+    --line-soft:#DEDFD3;
+    --shadow: 0 1px 0 rgba(31,37,34,0.06);
+    --maxw: 1180px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{
+    font-family:'Big Shoulders Display', sans-serif;
+    font-weight:700;
+    letter-spacing:0.2px;
+    margin:0;
+    color:var(--ink);
+  }
+  .num, .money, .mono{ font-family:'IBM Plex Mono', monospace; }
+  a{color:inherit;}
+  img,svg{display:block;max-width:100%;}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 20px;}
+  section{position:relative;}
+  button, input, select{font-family:inherit;}
+
+  :focus-visible{
+    outline:3px solid var(--teal);
+    outline-offset:2px;
+  }
+
+  /* AUTH MODAL & CONTAINER STYLES */
+  #authContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+    padding: 20px;
+  }
+  .auth-card {
+    background: var(--paper2);
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    padding: 30px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+  }
+  .auth-card h2 { font-size: 32px; margin-bottom: 8px; }
+  .auth-card p { font-size: 14px; color: #6B7370; margin-bottom: 20px; }
+  .auth-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .auth-tab-btn {
+    flex: 1; padding: 10px; background: transparent; border: none; font-weight: 700;
+    font-family: 'Big Shoulders Display', sans-serif; font-size: 18px; cursor: pointer; color: #6B7370;
+  }
+  .auth-tab-btn.active { color: var(--teal-deep); border-bottom: 3px solid var(--teal); }
+
+  /* HEADER NAV */
+  header.nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(247,243,232,0.98);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line-soft);
+  }
+  .nav-row{
+    display:flex; align-items:center; justify-content:space-between;
+    height:64px; gap:16px;
+  }
+  .brand{
+    display:flex; align-items:center; gap:8px; 
+    font-family:'Big Shoulders Display',sans-serif; font-weight:800; font-size:24px;
+    flex-shrink:0;
+  }
+  .brand .tickmark{width:22px;height:26px;}
+
+  .nav-links{
+    display:flex; gap:8px; align-items:center;
+    overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  }
+  .nav-links::-webkit-scrollbar{display:none;}
+  
+  .nav-btn{
+    background:transparent; border:none; padding:8px 14px; font-size:16px; font-weight:700;
+    color:#6B7370; cursor:pointer; transition:all 0.15s; white-space:nowrap;
+    font-family:'Big Shoulders Display', sans-serif; letter-spacing:0.5px;
+    border-radius:4px;
+  }
+  .nav-btn:hover{color:var(--ink); background:rgba(0,0,0,0.03);}
+  .nav-btn.active{
+    color:var(--teal-deep); background:var(--paper2); border:1px solid var(--line);
+  }
+
+  .user-badge {
+    font-size: 12px; font-weight: 600; color: var(--teal-deep); background: rgba(29, 78, 74, 0.1);
+    padding: 4px 10px; border-radius: 20px; font-family: 'IBM Plex Mono', monospace; display: flex; align-items: center; gap: 8px;
+  }
+  .btn-logout {
+    background: var(--chili); color: #fff; border: none; border-radius: 4px; padding: 4px 8px;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+  }
+
+  /* HERO */
+  .hero{padding:24px 0 20px;}
+  .hero h1{font-size:clamp(28px, 4vw, 42px); line-height:1.05; max-width:22ch;}
+  .free-badge{
+    display:inline-block; background:var(--teal); color:var(--paper2);
+    font-family:'IBM Plex Mono', monospace; font-size:11px; font-weight:600;
+    padding:3px 10px; border-radius:20px; margin-bottom:8px; text-transform:uppercase;
+  }
+  .hero p.lead{margin-top:8px; font-size:15px; max-width:58ch; color:#3A423F;}
+
+  /* TAB CONTENT PANELS */
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  .app-grid{display:grid; grid-template-columns: 1.2fr 0.8fr; gap:20px; align-items:start;}
+  @media(max-width:850px){ .app-grid{grid-template-columns:1fr;} }
+
+  .app-card{
+    background:var(--paper2); border:1.5px solid var(--line); border-radius:8px; padding:20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03); overflow-x:auto;
+  }
+  .app-card h3{font-size:22px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;}
+
+  .menu-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; margin-bottom:16px;}
+  .menu-btn{
+    background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:10px;
+    text-align:left; transition:all 0.15s; cursor:pointer;
+  }
+  .menu-btn:hover{border-color:var(--teal); background:#FFF;}
+  .menu-btn .name{font-weight:600; font-size:13.5px; display:block;}
+  .menu-btn .price{font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--teal-deep);}
+
+  .bill-table{width:100%; border-collapse:collapse; margin-bottom:16px; font-size:13.5px; min-width:300px;}
+  .bill-table th{text-align:left; border-bottom:1px solid var(--line); padding-bottom:6px; font-size:11.5px; color:#6B7370;}
+  .bill-table td{padding:8px 0; border-bottom:1px solid var(--line-soft);}
+  .qty-controls{display:flex; gap:6px; align-items:center;}
+  .qty-btn{width:22px; height:22px; border:1px solid var(--line); background:var(--paper); border-radius:3px; line-height:1; cursor:pointer;}
+
+  .discount-box{
+    display:flex; gap:8px; align-items:center; margin-bottom:12px; padding:8px;
+    background:rgba(232, 163, 61, 0.1); border:1px solid var(--line); border-radius:4px;
+  }
+  .discount-box label{font-size:11.5px; font-weight:600; color:var(--ink); white-space:nowrap;}
+  .discount-box input{
+    width:70px; padding:4px 6px; border:1px solid var(--line); border-radius:3px;
+    font-family:'IBM Plex Mono', monospace; font-size:12.5px; background:#FFF;
+  }
+  .discount-box select{
+    padding:4px 6px; border:1px solid var(--line); border-radius:3px;
+    font-size:12px; background:#FFF; font-weight:600;
+  }
+
+  .bill-summary{border-top:2px dashed var(--line); padding-top:12px; font-family:'IBM Plex Mono', monospace;}
+  .summary-row{display:flex; justify-content:space-between; margin-bottom:6px; font-size:13.5px;}
+  .summary-row.discount{color:var(--chili); font-weight:500;}
+  .summary-row.total{font-size:16.5px; font-weight:700; color:var(--ink); border-top:1px solid var(--ink); padding-top:8px; margin-top:8px;}
+
+  .action-btns{display:flex; gap:8px; margin-top:16px;}
+  .btn-action{
+    flex:1; padding:10px 6px; border:none; border-radius:4px; font-weight:700; font-size:13px; text-align:center; cursor:pointer;
+  }
+  .btn-pay{background:var(--saffron); color:var(--ink); box-shadow:0 2px 0 var(--saffron-deep);}
+  .btn-pay:hover{background:#df972f;}
+  .btn-print{background:var(--teal); color:#FFF; box-shadow:0 2px 0 var(--teal-deep);}
+  .btn-print:hover{background:var(--teal-deep);}
+  .btn-clear{background:transparent; border:1px solid var(--line); color:var(--ink);}
+
+  /* HIDDEN PRINT RECEIPT CONTAINER */
+  #printableReceipt {
+    display: none;
+  }
+
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    #printableReceipt, #printableReceipt * {
+      visibility: visible;
+    }
+    #printableReceipt {
+      display: block !important;
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 80mm;
+      padding: 10px;
+      margin: 0;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      line-height: 1.3;
+      color: #000;
+      background: #fff;
+    }
+    #printableReceipt .receipt-header {
+      text-align: center;
+      border-bottom: 1px dashed #000;
+      padding-bottom: 8px;
+      margin-bottom: 8px;
+    }
+    #printableReceipt h2 {
+      font-family: 'Big Shoulders Display', sans-serif;
+      font-size: 22px;
+      margin: 0 0 2px 0;
+    }
+    #printableReceipt .receipt-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+    }
+    #printableReceipt .receipt-table th {
+      border-bottom: 1px solid #000;
+      text-align: left;
+      font-size: 10px;
+    }
+    #printableReceipt .receipt-table td {
+      padding: 4px 0;
+    }
+    #printableReceipt .receipt-divider {
+      border-top: 1px dashed #000;
+      margin: 6px 0;
+    }
+    #printableReceipt .receipt-row {
+      display: flex;
+      justify-content: space-between;
+    }
+    #printableReceipt .receipt-row.total {
+      font-weight: bold;
+      font-size: 13px;
+      border-top: 1px solid #000;
+      padding-top: 4px;
+      margin-top: 4px;
+    }
+    #printableReceipt .receipt-footer {
+      text-align: center;
+      margin-top: 12px;
+      font-size: 10px;
+    }
+  }
+
+  /* SUB-TABS FOR ORDERS TAB */
+  .sub-tabs {
+    display: flex;
+    gap: 10px;
+    border-bottom: 2px solid var(--line-soft);
+    margin-bottom: 16px;
+  }
+  .sub-tab-btn {
+    background: transparent;
+    border: none;
+    padding: 8px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #6B7370;
+    cursor: pointer;
+    font-family: 'Big Shoulders Display', sans-serif;
+    letter-spacing: 0.5px;
+    border-bottom: 3px solid transparent;
+    transition: all 0.15s;
+  }
+  .sub-tab-btn:hover { color: var(--ink); }
+  .sub-tab-btn.active {
+    color: var(--teal-deep);
+    border-bottom: 3px solid var(--teal);
+  }
+  .order-sub-panel { display: none; }
+  .order-sub-panel.active { display: block; }
+
+  /* ORDER PREPARATION TRACKER STYLES */
+  .orders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .order-card {
+    background: var(--paper);
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.04);
+  }
+  .order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+  .order-id { font-weight: 800; font-size: 18px; color: var(--teal-deep); }
+  .order-time-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--paper2);
+    border: 1px solid var(--line);
+  }
+  .order-status-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .order-status-badge.status-ready { background: #C6F6D5; color: #22543D; border: 1px solid #9AE6B4; }
+  .order-status-badge.status-cancelled { background: #FED7D7; color: #742A2A; border: 1px solid #FEB2B2; }
+
+  .order-items-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    flex-grow: 1;
+  }
+  .order-items-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dashed var(--line-soft);
+  }
+  .prep-progress-container {
+    margin: 10px 0 14px 0;
+  }
+  .prep-progress-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .progress-bar-bg {
+    width: 100%;
+    height: 10px;
+    background: var(--line-soft);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--teal);
+    transition: width 1s linear, background-color 0.3s;
+  }
+  .order-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-ready {
+    flex: 1;
+    background: #276749;
+    color: #FFF;
+    border: none;
+    padding: 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-ready:hover { background: #1D4E3A; }
+  .btn-cancel-order {
+    flex: 1;
+    background: var(--chili);
+    color: #FFF;
+    border: none;
+    padding: 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-cancel-order:hover { background: #9B311E; }
+
+  .form-group-grid{display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-bottom:12px;}
+  .recipe-builder-box{background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:12px;}
+  .ingredient-row{display:grid; grid-template-columns: 1.5fr 1fr auto; gap:10px; align-items:end; margin-bottom:8px;}
+
+  .stock-entry-grid{display:grid; grid-template-columns: 1.2fr 1fr 1fr auto; gap:10px; align-items:end;}
+  .adjust-stock-grid{display:grid; grid-template-columns: 1.2fr 1fr 1fr 1.5fr auto; gap:10px; align-items:end;}
+
+  @media(max-width:850px){ 
+    .form-group-grid{grid-template-columns:1fr;} 
+    .ingredient-row{grid-template-columns:1fr;}
+    .stock-entry-grid{grid-template-columns:1fr;}
+    .adjust-stock-grid{grid-template-columns:1fr;}
+  }
+  
+  .form-field{display:flex; flex-direction:column; gap:4px;}
+  .form-field label{font-size:11.5px; font-weight:600; color:#6B7370;}
+  .form-field input, .form-field select{
+    padding:8px; border:1px solid var(--line); border-radius:4px; font-size:13.5px; background:var(--paper); width:100%;
+  }
+  .recipe-builder-box .form-field input, .recipe-builder-box .form-field select{ background:#FFF; }
+
+  .btn-add{
+    background:var(--teal); color:var(--paper2); border:none; padding:9px 14px; border-radius:4px; font-weight:600; cursor:pointer; height:37px; font-size:13.5px;
+  }
+  .btn-add:hover{background:var(--teal-deep);}
+
+  .btn-secondary{
+    background:transparent; border:1px solid var(--teal); color:var(--teal); padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:12.5px;
+  }
+  .btn-secondary:hover{background:rgba(29,78,74,0.08);}
+
+  .btn-adjust{
+    background:var(--saffron-deep); color:#FFF; border:none; padding:9px 14px; border-radius:4px; font-weight:600; cursor:pointer; height:37px; font-size:13.5px;
+  }
+  .btn-adjust:hover{background:#b07020;}
+
+  .edit-price-input{
+    width:75px; padding:4px 6px; border:1px solid var(--line); border-radius:3px; font-family:'IBM Plex Mono', monospace;
+  }
+  .btn-remove{
+    background:transparent; border:1px solid var(--chili); color:var(--chili); padding:4px 8px; border-radius:3px; font-size:11.5px; font-weight:600; cursor:pointer;
+  }
+  .btn-remove:hover{background:var(--chili); color:#FFF;}
+
+  .reports-card{background:var(--teal-deep); color:var(--paper2); border-radius:8px; padding:24px;}
+  .reports-card h3{color:var(--paper2); font-size:24px;}
+
+  /* TIME FILTER BAR STYLES */
+  .filter-bar-container {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 16px 0 20px 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .filter-preset-btns {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--paper2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { background: rgba(255, 255, 255, 0.2); }
+  .filter-btn.active {
+    background: var(--saffron);
+    color: var(--ink);
+    border-color: var(--saffron-deep);
+  }
+  .custom-date-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .custom-date-group label { font-size: 12px; color: #CFE0DD; }
+  .custom-date-group input[type="date"] {
+    background: var(--paper2);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12.5px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .metrics-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; margin:16px 0;}
+  .metric-card{background:rgba(255,255,255,0.06); padding:14px; border-radius:6px; border:1px solid rgba(255,255,255,0.1);}
+  .metric-card span{display:block; font-size:12px; color:#A9AFA9;}
+  .metric-card b{font-family:'IBM Plex Mono', monospace; font-size:20px; color:var(--saffron); margin-top:4px; display:block;}
+
+  .export-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn-export-excel {
+    background: #276749; color: #FFF; border: none; padding: 8px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px;
+  }
+  .btn-export-excel:hover { background: #1D4ED8; }
+  .btn-export-word {
+    background: #2B6CB0; color: #FFF; border: none; padding: 8px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px;
+  }
+  .btn-export-word:hover { background: #1C3D5A; }
+
+  .charts-grid-top { display: grid; grid-template-columns: 1fr; margin: 20px 0; }
+  .charts-grid-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+  @media(max-width: 850px) { .charts-grid-bottom { grid-template-columns: 1fr; } }
+
+  .chart-box {
+    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px; position: relative; height: 300px;
+  }
+
+  .report-table{width:100%; border-collapse:collapse; margin-top:14px; font-size:13.5px; color:var(--paper2); min-width:300px;}
+  .report-table th, .report-table td{padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;}
+  .report-table th{color:var(--saffron); font-weight:600;}
+
+  footer{background:var(--ink); color:#A9AFA9; padding:20px 0; margin-top:40px; border-top:1px solid rgba(247,243,232,0.1);}
+  .foot-bottom{font-size:12px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+</style>
+</head>
+<body>
+
+<!-- HEADER SECTION -->
+<header class="nav">
+  <div class="wrap nav-row">
+    <div class="brand">
+      <svg class="tickmark" viewBox="0 0 26 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 2H24V24L20 28L16 24L13 28L10 24L6 28L2 24V2Z" fill="#1F2523"/>
+        <line x1="6" y1="9" x2="20" y2="9" stroke="#F7F3E8" stroke-width="1.6"/>
+        <line x1="6" y1="14" x2="20" y2="14" stroke="#F7F3E8" stroke-width="1.6"/>
+        <line x1="6" y1="19" x2="14" y2="19" stroke="#F7F3E8" stroke-width="1.6"/>
+      </svg>
+      Bilkul
+    </div>
+
+    <!-- Navigation links -->
+    <nav class="nav-links" id="mainNav" style="display:none;">
+      <button class="nav-btn active" onclick="switchTab('billing')" id="nav-billing">01. Take Bills</button>
+      <button class="nav-btn" onclick="switchTab('orders')" id="nav-orders">02. Order Progress</button>
+      <button class="nav-btn" onclick="switchTab('menu')" id="nav-menu">03. Manage Menu</button>
+      <button class="nav-btn" onclick="switchTab('inventory')" id="nav-inventory">04. Inventory &amp; Stock</button>
+      <button class="nav-btn" onclick="switchTab('reports')" id="nav-reports">05. Sales Reports</button>
+    </nav>
+
+    <!-- User Authentication Status Header -->
+    <div id="userHeaderStatus" style="display:none;">
+      <div class="user-badge">
+        <span id="userEmailDisplay">user@example.com</span>
+        <button class="btn-logout" onclick="logoutUser()">Logout</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- LOGIN / REGISTER CONTAINER -->
+<div id="authContainer">
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" id="tabBtnLogin" onclick="switchAuthMode('login')">Login</button>
+      <button class="auth-tab-btn" id="tabBtnRegister" onclick="switchAuthMode('register')">Register</button>
+    </div>
+    <h2 id="authTitle">Welcome Back</h2>
+    <p id="authSubtitle">Sign in to access your cloud POS & inventory database.</p>
+    
+    <div class="form-field" style="margin-bottom:12px;">
+      <label>Email Address</label>
+      <input type="email" id="authEmail" placeholder="restaurant@example.com">
+    </div>
+    <div class="form-field" style="margin-bottom:20px;">
+      <label>Password</label>
+      <input type="password" id="authPassword" placeholder="••••••••">
+    </div>
+
+    <button class="btn-add" id="authSubmitBtn" onclick="handleAuthSubmit()" style="width:100%; height:42px; font-size:15px;">Login to POS</button>
+  </div>
+</div>
+
+<!-- MAIN APPLICATION BODY (AUTHENTICATED ONLY) -->
+<div id="appContainer" style="display:none;">
+
+  <section class="hero">
+    <div class="wrap">
+      <span class="free-badge">Cloud Syncing Active · Realtime Database</span>
+      <h1>Free Restaurant POS &amp; Live Analytics</h1>
+      <p class="lead">All changes to menu items, raw materials, stock adjustments, and bills are instantly synced to your database.</p>
+    </div>
+  </section>
+
+  <section class="wrap" style="padding-bottom: 40px;">
+
+    <!-- TAB 1: BILLING (POS) -->
+    <div class="tab-panel active" id="tab-billing">
+      <div class="app-grid">
+        <!-- MENU SELECTION -->
+        <div class="app-card">
+          <h3>
+            <span>Select Menu Items</span>
+            <small style="font-size:11.5px; font-weight:normal; color:#6B7370;">Click item to add</small>
+          </h3>
+          <div class="menu-grid" id="menuGrid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- BILL COUNTER -->
+        <div class="app-card">
+          <h3>Current Order Pad</h3>
+          <table class="bill-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody id="billItems">
+              <tr><td colspan="3" style="text-align:center; color:#888; padding:20px;">No items added yet. Click items on the left menu.</td></tr>
+            </tbody>
+          </table>
+
+          <!-- DISCOUNT SECTION -->
+          <div class="discount-box">
+            <label>Apply Discount:</label>
+            <input type="number" id="discountValue" value="0" min="0" placeholder="0" oninput="updateBillUI()">
+            <select id="discountType" onchange="updateBillUI()">
+              <option value="percent">% Off</option>
+              <option value="flat">₹ Flat</option>
+            </select>
+          </div>
+
+          <div class="bill-summary">
+            <div class="summary-row"><span>Subtotal</span><span id="subTotal">₹0.00</span></div>
+            <div class="summary-row discount"><span>Discount</span><span id="discountTotal">-₹0.00</span></div>
+            <div class="summary-row"><span>GST (5%)</span><span id="taxTotal">₹0.00</span></div>
+            <div class="summary-row total"><span>Total Amount</span><span id="grandTotal">₹0.00</span></div>
+          </div>
+
+          <div class="action-btns">
+            <button class="btn-action btn-clear" onclick="clearBill()">Clear Pad</button>
+            <button class="btn-action btn-print" onclick="printBill()">🖨️ Print Bill</button>
+            <button class="btn-action btn-pay" onclick="checkoutBill()">Take Bill &amp; Complete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: ORDER PREPARATION MONITORING WITH SUB TABS -->
+    <div class="tab-panel" id="tab-orders">
+      <div class="app-card">
+        <h3>Kitchen Preparation Tracker</h3>
+
+        <!-- Sub Tabs Navigation -->
+        <div class="sub-tabs">
+          <button class="sub-tab-btn active" id="sub-btn-in-progress" onclick="switchOrdersSubTab('in-progress')">In-Progress</button>
+          <button class="sub-tab-btn" id="sub-btn-recent" onclick="switchOrdersSubTab('recent')">Recent Orders</button>
+        </div>
+
+        <!-- Sub Panel 1: In Progress Orders -->
+        <div class="order-sub-panel active" id="order-sub-in-progress">
+          <div class="orders-grid" id="inProgressGridContainer">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Sub Panel 2: Recent Orders -->
+        <div class="order-sub-panel" id="order-sub-recent">
+          <div class="orders-grid" id="recentGridContainer">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- TAB 3: MANAGE MENU -->
+    <div class="tab-panel" id="tab-menu">
+      <div class="app-card" style="margin-bottom:20px;">
+        <h3>Add New Menu Item</h3>
+        <div class="form-group-grid">
+          <div class="form-field">
+            <label>Item Name</label>
+            <input type="text" id="newItemName" placeholder="e.g. Paneer Butter Masala">
+          </div>
+          <div class="form-field">
+            <label>Price (₹)</label>
+            <input type="number" id="newItemPrice" placeholder="260">
+          </div>
+        </div>
+
+        <!-- MULTI INGREDIENT RECIPE BUILDER -->
+        <div class="recipe-builder-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <label style="font-size:12.5px; font-weight:700; color:var(--teal-deep);">Recipe Ingredients (Multi-Select)</label>
+            <button class="btn-secondary" onclick="addIngredientRow()">+ Add Ingredient</button>
+          </div>
+          <div id="ingredientRowsContainer">
+            <!-- Dynamic Ingredient Rows inserted here -->
+          </div>
+        </div>
+
+        <button class="btn-add" onclick="addNewMenuItem()" style="width:100%; font-size:14px; height:40px;">+ Save Menu Item to Database</button>
+      </div>
+
+      <div class="app-card">
+        <h3>
+          <span>Edit or Remove Menu Items</span>
+          <small style="font-size:11.5px; font-weight:normal; color:#6B7370;">Price edits update immediately in POS</small>
+        </h3>
+        <table class="bill-table" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Recipe / Ingredients Link</th>
+              <th>Price (₹)</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="manageMenuBody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: INVENTORY & RAW MATERIAL TRACKING -->
+    <div class="tab-panel" id="tab-inventory">
+      <div class="app-grid" style="margin-bottom:20px;">
+        
+        <!-- STOCK ENTRY / INWARD RECEIVING -->
+        <div class="app-card">
+          <h3>Stock Entry (Inward Purchase)</h3>
+          <p style="font-size:12.5px; color:#6B7370; margin-bottom:12px;">Add newly purchased raw materials & cost price to calculate net sales/profits.</p>
+          <div class="stock-entry-grid">
+            <div class="form-field">
+              <label>Raw Material</label>
+              <select id="stockIngredientSelect">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Quantity Added</label>
+              <input type="number" step="0.1" id="stockQtyInput" placeholder="e.g. 5.0">
+            </div>
+            <div class="form-field">
+              <label>Cost Price / Unit (₹)</label>
+              <input type="number" step="0.5" id="stockPriceInput" placeholder="e.g. 220">
+            </div>
+            <button class="btn-add" onclick="addStockEntry()">+ Add Stock</button>
+          </div>
+        </div>
+
+        <!-- CREATE NEW INGREDIENT -->
+        <div class="app-card">
+          <h3>Register New Ingredient</h3>
+          <p style="font-size:12.5px; color:#6B7370; margin-bottom:12px;">Create a new raw material item to track.</p>
+          <div class="stock-entry-grid" style="grid-template-columns: 1fr 1fr auto;">
+            <div class="form-field">
+              <label>Material Name</label>
+              <input type="text" id="newIngName" placeholder="e.g. Butter">
+            </div>
+            <div class="form-field">
+              <label>Unit (kg, L, Units)</label>
+              <input type="text" id="newIngUnit" placeholder="kg">
+            </div>
+            <button class="btn-add" onclick="registerNewIngredient()">Create</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MANUAL ADJUST STOCK -->
+      <div class="app-card" style="margin-bottom:20px;">
+        <h3>Adjust Raw Material Stock (Wastage / Audit Corrections)</h3>
+        <p style="font-size:12.5px; color:#6B7370; margin-bottom:12px;">Manually increase or decrease current stock for physical inventory audits, wastage, or damage.</p>
+        <div class="adjust-stock-grid">
+          <div class="form-field">
+            <label>Raw Material</label>
+            <select id="adjustIngredientSelect">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Action</label>
+            <select id="adjustActionType">
+              <option value="add">Add Stock (+)</option>
+              <option value="subtract">Subtract / Deduct (-)</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Quantity</label>
+            <input type="number" step="0.01" id="adjustQtyInput" placeholder="e.g. 0.5">
+          </div>
+          <div class="form-field">
+            <label>Reason / Note</label>
+            <input type="text" id="adjustReasonInput" placeholder="e.g. Spoilage / Stock Audit">
+          </div>
+          <button class="btn-adjust" onclick="adjustStockEntry()">Apply Adjustment</button>
+        </div>
+      </div>
+
+      <!-- CURRENT INVENTORY SUMMARY -->
+      <div class="app-card" style="margin-bottom:20px;">
+        <h3>
+          <span>Live Raw Material Stock Levels &amp; Costing</span>
+          <small style="font-size:11.5px; font-weight:normal; color:#6B7370;">Auto-deducts on sales</small>
+        </h3>
+        <table class="bill-table" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Raw Material</th>
+              <th>Current Level</th>
+              <th>Avg Cost / Unit</th>
+              <th>Total Consumed</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryBody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- USAGE LOGS -->
+      <div class="app-card">
+        <h3>Raw Material Usage &amp; Activity Log</h3>
+        <table class="bill-table" style="margin-top:12px;">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Ingredient</th>
+              <th>Qty Change</th>
+              <th>Reason / Type</th>
+            </tr>
+          </thead>
+          <tbody id="stockLogBody">
+            <tr><td colspan="4" style="text-align:center; color:#888; padding:16px;">No inventory activity recorded yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 5: SALES REPORTS -->
+    <div class="tab-panel" id="tab-reports">
+      <div class="reports-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h3>Live Sales &amp; Profit Reports</h3>
+            <p style="font-size:13px; color:#CFE0DD; margin-top:4px;">Filter sales report data across different time ranges or select custom start and end dates.</p>
+          </div>
+
+          <div class="export-bar">
+            <button onclick="exportSalesReportToExcel()" class="btn-export-excel">📊 Export Excel (.xlsx)</button>
+            <button onclick="exportSalesReportToWord()" class="btn-export-word">📄 Export Word (.docx)</button>
+          </div>
+        </div>
+
+        <!-- TIME RANGE FILTER BAR -->
+        <div class="filter-bar-container">
+          <div class="filter-preset-btns">
+            <button class="filter-btn active" id="btnFilterToday" onclick="setTimeFilter('today')">Today</button>
+            <button class="filter-btn" id="btnFilterWeek" onclick="setTimeFilter('week')">This Week</button>
+            <button class="filter-btn" id="btnFilterMonth" onclick="setTimeFilter('month')">This Month</button>
+            <button class="filter-btn" id="btnFilterYear" onclick="setTimeFilter('year')">This Year</button>
+            <button class="filter-btn" id="btnFilterAll" onclick="setTimeFilter('all')">All Time</button>
+          </div>
+
+          <div class="custom-date-group">
+            <label>From:</label>
+            <input type="date" id="reportStartDate" onchange="applyCustomDateFilter()">
+            <label>To:</label>
+            <input type="date" id="reportEndDate" onchange="applyCustomDateFilter()">
+          </div>
+        </div>
+        
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span>Total Orders</span>
+            <b id="repOrders">0</b>
+          </div>
+          <div class="metric-card">
+            <span>Gross Sales (Revenue)</span>
+            <b id="repRevenue">₹0.00</b>
+          </div>
+          <div class="metric-card">
+            <span>Discounts Given</span>
+            <b id="repDiscount" style="color:var(--chili);">₹0.00</b>
+          </div>
+          <div class="metric-card">
+            <span>Total Raw Material Cost</span>
+            <b id="repCogs" style="color:#E53E3E;">₹0.00</b>
+          </div>
+          <div class="metric-card">
+            <span>Net Sales (Profit)</span>
+            <b id="repNetSales" style="color:#48BB78;">₹0.00</b>
+          </div>
+        </div>
+
+        <!-- CHART 1: ORDERS OVER TIME -->
+        <div class="charts-grid-top">
+          <div class="chart-box">
+            <h4 style="margin-bottom:10px; font-size:15px; color:var(--paper2);" id="ordersChartTitle">Orders Count Over Time</h4>
+            <canvas id="ordersChart"></canvas>
+          </div>
+        </div>
+
+        <!-- CHARTS 2 & 3: GROSS vs NET SALES -->
+        <div class="charts-grid-bottom">
+          <div class="chart-box">
+            <h4 style="margin-bottom:10px; font-size:15px; color:var(--paper2);">Gross Sales Over Time (₹)</h4>
+            <canvas id="grossSalesChart"></canvas>
+          </div>
+          <div class="chart-box">
+            <h4 style="margin-bottom:10px; font-size:15px; color:var(--paper2);">Net Sales / Profit Over Time (₹)</h4>
+            <canvas id="netSalesChart"></canvas>
+          </div>
+        </div>
+
+        <h4 style="margin-top:20px; font-size:16px; color:var(--paper2);">Sales Breakdown by Item</h4>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th>Units Sold</th>
+              <th>Gross Revenue</th>
+            </tr>
+          </thead>
+          <tbody id="salesBreakdown">
+            <tr><td colspan="3" style="color:#A9AFA9;">No sales recorded for the selected time range.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+</div>
+
+<!-- HIDDEN THERMAL RECEIPT PRINT TEMPLATE -->
+<div id="printableReceipt">
+  <div class="receipt-header">
+    <h2>BILKUL POS</h2>
+    <p style="margin:2px 0;">Restaurant &amp; Dining</p>
+    <p style="margin:2px 0;" id="printDate">Date: --/--/---- --:--</p>
+  </div>
+  <table class="receipt-table">
+    <thead>
+      <tr>
+        <th style="width:50%;">Item</th>
+        <th style="width:20%; text-align:center;">Qty</th>
+        <th style="width:30%; text-align:right;">Amt</th>
+      </tr>
+    </thead>
+    <tbody id="printReceiptItems">
+      <!-- Injected dynamically -->
+    </tbody>
+  </table>
+  <div class="receipt-divider"></div>
+  <div class="receipt-row"><span>Subtotal:</span><span id="printSubtotal">₹0.00</span></div>
+  <div class="receipt-row"><span>Discount:</span><span id="printDiscount">-₹0.00</span></div>
+  <div class="receipt-row"><span>GST (5%):</span><span id="printTax">₹0.00</span></div>
+  <div class="receipt-row total"><span>GRAND TOTAL:</span><span id="printGrandTotal">₹0.00</span></div>
+  <div class="receipt-footer">
+    <p style="margin:10px 0 0 0;">*** Thank You! Visit Again ***</p>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-bottom">
+      <span>© 2026 Bilkul POS. Free billing, inventory &amp; reporting database for restaurants.</span>
+      <span>No hidden charges. Fully functional.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // 1. FIREBASE CONFIGURATION
+  const firebaseConfig = {
+    apiKey: "AIzaSyCziIy3OMaMT-s-d65q63bBfptE4MLC6rk",
+    authDomain: "bilkul-95cf2.firebaseapp.com",
+    databaseURL: "https://bilkul-95cf2-default-rtdb.firebaseio.com",
+    projectId: "bilkul-95cf2",
+    storageBucket: "bilkul-95cf2.firebasestorage.app",
+    messagingSenderId: "827545459369",
+    appId: "1:827545459369:web:3e86b9c800168a35b2e7b8",
+    measurementId: "G-564X1M66DZ"
+  };
+
+  // Initialize Firebase & Services
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.database();
+  const analytics = firebase.analytics();
+
+  // App Global State
+  let currentUser = null;
+  let currentAuthMode = 'login'; 
+
+  let menu = [];
+  let inventory = {};
+  let stockLogs = [];
+  let currentBill = {};
+  let activeOrders = [];
+  let completedOrders = []; // Full transaction order history for date filtering
+  let prepTimerInterval = null;
+
+  // Selected Filter State
+  let activeTimeFilter = 'today'; 
+
+  let filteredSalesSummary = {
+    totalOrders: 0,
+    grossSales: 0,
+    totalDiscount: 0,
+    cogs: 0,
+    netSales: 0,
+    itemsSold: {}
+  };
+
+  let ordersChartInstance = null;
+  let grossChartInstance = null;
+  let netChartInstance = null;
+
+  // Initializing Default Data Structure for new users
+  const defaultMenu = [
+    { id: 1, name: "Paneer Tikka", price: 230, ingredients: [{ name: "Paneer", usage: 0.2 }, { name: "Butter", usage: 0.05 }] },
+    { id: 2, name: "Butter Naan", price: 70, ingredients: [{ name: "Flour", usage: 0.1 }, { name: "Butter", usage: 0.02 }] },
+    { id: 3, name: "Masala Chai", price: 60, ingredients: [{ name: "Milk", usage: 0.15 }] }
+  ];
+
+  const defaultInventory = {
+    "Paneer": { stock: 5.0, totalConsumed: 0.0, unit: "kg", unitCost: 240 },
+    "Flour": { stock: 10.0, totalConsumed: 0.0, unit: "kg", unitCost: 45 },
+    "Milk": { stock: 8.0, totalConsumed: 0.0, unit: "L", unitCost: 60 },
+    "Butter": { stock: 4.0, totalConsumed: 0.0, unit: "kg", unitCost: 480 }
+  };
+
+  // 2. AUTHENTICATION MANAGEMENT
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('authContainer').style.display = 'none';
+      document.getElementById('appContainer').style.display = 'block';
+      document.getElementById('mainNav').style.display = 'flex';
+      document.getElementById('userHeaderStatus').style.display = 'block';
+      document.getElementById('userEmailDisplay').innerText = user.email;
+
+      attachDatabaseListeners(user.uid);
+      initCharts();
+      startPrepTimerLoop();
+    } else {
+      currentUser = null;
+      document.getElementById('authContainer').style.display = 'flex';
+      document.getElementById('appContainer').style.display = 'none';
+      document.getElementById('mainNav').style.display = 'none';
+      document.getElementById('userHeaderStatus').style.display = 'none';
+      if(prepTimerInterval) clearInterval(prepTimerInterval);
+    }
+  });
+
+  function switchAuthMode(mode) {
+    currentAuthMode = mode;
+    const tabLogin = document.getElementById('tabBtnLogin');
+    const tabRegister = document.getElementById('tabBtnRegister');
+    const title = document.getElementById('authTitle');
+    const subtitle = document.getElementById('authSubtitle');
+    const btn = document.getElementById('authSubmitBtn');
+
+    if (mode === 'login') {
+      tabLogin.classList.add('active');
+      tabRegister.classList.remove('active');
+      title.innerText = "Welcome Back";
+      subtitle.innerText = "Sign in to access your cloud POS & inventory database.";
+      btn.innerText = "Login to POS";
+    } else {
+      tabRegister.classList.add('active');
+      tabLogin.classList.remove('active');
+      title.innerText = "Create Account";
+      subtitle.innerText = "Register a new store account to save your sales and inventory data.";
+      btn.innerText = "Register & Create Store";
+    }
+  }
+
+  function handleAuthSubmit() {
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+
+    if (!email || !password) {
+      alert("Please enter both email and password.");
+      return;
+    }
+
+    if (currentAuthMode === 'login') {
+      auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+          analytics.logEvent('login', { method: 'email' });
+        })
+        .catch(err => alert("Login Error: " + err.message));
+    } else {
+      auth.createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+          analytics.logEvent('sign_up', { method: 'email' });
+          const uid = userCredential.user.uid;
+          db.ref(`users/${uid}/menu`).set(defaultMenu)
+            .catch(err => console.error('Failed to set default menu:', err));
+          db.ref(`users/${uid}/inventory`).set(defaultInventory)
+            .catch(err => console.error('Failed to set default inventory:', err));
+        })
+        .catch(err => alert("Registration Error: " + err.message));
+    }
+  }
+
+  function logoutUser() {
+    auth.signOut();
+  }
+
+  // 3. REALTIME DATABASE LISTENERS
+  function attachDatabaseListeners(uid) {
+    const userRef = db.ref(`users/${uid}`);
+
+    userRef.child('menu').on('value', snapshot => {
+      menu = snapshot.val() || [];
+      renderMenu();
+      renderManageMenu();
+    });
+
+    userRef.child('inventory').on('value', snapshot => {
+      inventory = snapshot.val() || {};
+      renderInventory();
+      renderManageMenu();
+    });
+
+    userRef.child('activeOrders').on('value', snapshot => {
+      const val = snapshot.val() || [];
+      activeOrders = Array.isArray(val) ? val : Object.values(val);
+      renderActiveOrders();
+    });
+
+    userRef.child('stockLogs').on('value', snapshot => {
+      const logsObj = snapshot.val() || {};
+      stockLogs = Object.values(logsObj).reverse();
+      renderStockLogs();
+    });
+
+    userRef.child('completedOrders').on('value', snapshot => {
+      const ordersObj = snapshot.val() || {};
+      completedOrders = Object.values(ordersObj);
+      filterSalesReport();
+    });
+  }
+
+  function saveToDb(path, data) {
+    if (!currentUser) {
+      alert("You're not signed in yet, so this can't be saved. Please log in again.");
+      return Promise.resolve();
+    }
+    return db.ref(`users/${currentUser.uid}/${path}`).set(data)
+      .catch(err => {
+        alert(`Failed to save to database (${path}): ${err.message}`);
+        throw err;
+      });
+  }
+
+  function pushToDbList(path, data) {
+    if (!currentUser) {
+      alert("You're not signed in yet, so this can't be saved. Please log in again.");
+      return Promise.resolve();
+    }
+    return db.ref(`users/${currentUser.uid}/${path}`).push(data)
+      .catch(err => {
+        alert(`Failed to save to database (${path}): ${err.message}`);
+        throw err;
+      });
+  }
+
+  // 4. UI TAB NAVIGATION
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+    document.getElementById(`nav-${tabName}`).classList.add('active');
+
+    if(tabName === 'reports') {
+      filterSalesReport();
+    }
+
+    analytics.logEvent('page_view', { page_title: tabName });
+  }
+
+  function switchOrdersSubTab(subTabName) {
+    document.querySelectorAll('.order-sub-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+
+    document.getElementById(`order-sub-${subTabName}`).classList.add('active');
+    document.getElementById(`sub-btn-${subTabName}`).classList.add('active');
+  }
+
+  // 5. MENU MANAGEMENT & DATABASE ACTIONS
+  function renderMenu() {
+    const grid = document.getElementById('menuGrid');
+    if (!grid) return;
+    grid.innerHTML = menu.map(item => `
+      <button class="menu-btn" onclick="addToBill(${item.id})">
+        <span class="name">${item.name}</span>
+        <span class="price">₹${item.price}</span>
+      </button>
+    `).join('');
+  }
+
+  function addIngredientRow(selectedIng = '', usageVal = '') {
+    const container = document.getElementById('ingredientRowsContainer');
+    const rowId = 'ingRow_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+    const ingKeys = Object.keys(inventory);
+    let ingOptions = '';
+
+    if (ingKeys.length === 0) {
+      ingOptions = '<option value="" disabled selected>No ingredients registered yet</option>';
+    } else {
+      const defaultOption = `<option value="" ${selectedIng === '' ? 'selected disabled' : ''}>-- Select Ingredient --</option>`;
+      const optionsList = ingKeys.map(ing => `
+        <option value="${ing}" ${ing === selectedIng ? 'selected' : ''}>${ing}</option>
+      `).join('');
+
+      ingOptions = defaultOption + optionsList;
+    }
+
+    const rowHtml = `
+      <div class="ingredient-row" id="${rowId}">
+        <div class="form-field">
+          <label>Ingredient</label>
+          <select class="recipe-ing-select">
+            ${ingOptions}
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Usage per Plate</label>
+          <input type="number" step="0.01" class="recipe-ing-usage" placeholder="e.g. 0.15" value="${usageVal}">
+        </div>
+        <button class="btn-remove" style="height:37px;" onclick="removeIngredientRow('${rowId}')">Remove</button>
+      </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', rowHtml);
+  }
+
+  function removeIngredientRow(rowId) {
+    const container = document.getElementById('ingredientRowsContainer');
+    if (container.children.length <= 1) {
+      alert("At least one ingredient row is required for a recipe.");
+      return;
+    }
+    const row = document.getElementById(rowId);
+    if (row) row.remove();
+  }
+
+  function resetRecipeForm() {
+    document.getElementById('ingredientRowsContainer').innerHTML = '';
+    addIngredientRow(); 
+  }
+
+  function renderManageMenu() {
+    const tbody = document.getElementById('manageMenuBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = menu.map(item => {
+      const ingListStr = (item.ingredients || []).map(i => {
+        const unit = inventory[i.name] ? inventory[i.name].unit : '';
+        return `<b>${i.name}</b> (${i.usage} ${unit})`;
+      }).join(', ');
+
+      return `
+        <tr>
+          <td><b>${item.name}</b></td>
+          <td style="font-size:12.5px; color:#3A423F;">${ingListStr}</td>
+          <td>
+            <input type="number" class="edit-price-input" value="${item.price}" onchange="updatePrice(${item.id}, this.value)">
+          </td>
+          <td>
+            <button class="btn-remove" onclick="removeMenuItem(${item.id})">Remove</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    const stockSelect = document.getElementById('stockIngredientSelect');
+    const adjustSelect = document.getElementById('adjustIngredientSelect');
+    
+    const optionsHtml = Object.keys(inventory).map(ing => `<option value="${ing}">${ing}</option>`).join('');
+    if(stockSelect) stockSelect.innerHTML = optionsHtml;
+    if(adjustSelect) adjustSelect.innerHTML = optionsHtml;
+  }
+
+  function addNewMenuItem() {
+    const nameInput = document.getElementById('newItemName');
+    const priceInput = document.getElementById('newItemPrice');
+
+    const name = nameInput.value.trim();
+    const price = parseFloat(priceInput.value);
+
+    if (!name || isNaN(price) || price <= 0) {
+      alert("Please enter a valid item name and price.");
+      return;
+    }
+
+    const rows = document.querySelectorAll('.ingredient-row');
+    let ingredients = [];
+
+    rows.forEach(row => {
+      const ingName = row.querySelector('.recipe-ing-select').value;
+      const usage = parseFloat(row.querySelector('.recipe-ing-usage').value);
+
+      if (ingName && !isNaN(usage) && usage > 0) {
+        ingredients.push({ name: ingName, usage: usage });
+      }
+    });
+
+    if (ingredients.length === 0) {
+      alert("Please enter a valid usage quantity for at least one ingredient.");
+      return;
+    }
+
+    const newId = menu.length > 0 ? Math.max(...menu.map(m => m.id)) + 1 : 1;
+    menu.push({ id: newId, name, price, ingredients });
+
+    saveToDb('menu', menu);
+
+    nameInput.value = '';
+    priceInput.value = '';
+    resetRecipeForm();
+    alert(`Menu item "${name}" saved to database!`);
+  }
+
+  function updatePrice(id, newPrice) {
+    const price = parseFloat(newPrice);
+    if (isNaN(price) || price < 0) return;
+    const item = menu.find(m => m.id === id);
+    if (item) {
+      item.price = price;
+      saveToDb('menu', menu);
+      updateBillUI();
+    }
+  }
+
+  function removeMenuItem(id) {
+    menu = menu.filter(m => m.id !== id);
+    delete currentBill[id];
+    saveToDb('menu', menu);
+    updateBillUI();
+  }
+
+  // 6. INVENTORY MANAGEMENT & DATABASE ACTIONS
+  function addStockEntry() {
+    const ingName = document.getElementById('stockIngredientSelect').value;
+    const qtyInput = document.getElementById('stockQtyInput');
+    const priceInput = document.getElementById('stockPriceInput');
+
+    const qty = parseFloat(qtyInput.value);
+    const unitPrice = parseFloat(priceInput.value) || inventory[ingName].unitCost || 0;
+
+    if (isNaN(qty) || qty <= 0) {
+      alert("Please enter a valid quantity.");
+      return;
+    }
+
+    if (inventory[ingName]) {
+      const currentStock = inventory[ingName].stock;
+      const oldCost = inventory[ingName].unitCost || 0;
+      const newStock = currentStock + qty;
+      
+      const weightedAvgCost = newStock > 0 
+        ? ((currentStock * oldCost) + (qty * unitPrice)) / newStock 
+        : unitPrice;
+
+      inventory[ingName].stock = newStock;
+      inventory[ingName].unitCost = weightedAvgCost;
+
+      saveToDb('inventory', inventory);
+      logStockActivity(ingName, `+${qty.toFixed(2)} ${inventory[ingName].unit}`, `Inward Stock @ ₹${unitPrice}/unit`);
+
+      qtyInput.value = '';
+      priceInput.value = '';
+      alert(`Updated stock in database for ${ingName}!`);
+    }
+  }
+
+  function adjustStockEntry() {
+    const ingName = document.getElementById('adjustIngredientSelect').value;
+    const action = document.getElementById('adjustActionType').value;
+    const qtyInput = document.getElementById('adjustQtyInput');
+    const reasonInput = document.getElementById('adjustReasonInput');
+
+    const qty = parseFloat(qtyInput.value);
+    const reason = reasonInput.value.trim() || (action === 'add' ? 'Manual Addition' : 'Manual Deduction/Wastage');
+
+    if (isNaN(qty) || qty <= 0) {
+      alert("Please enter a valid quantity to adjust.");
+      return;
+    }
+
+    if (inventory[ingName]) {
+      if (action === 'subtract') {
+        inventory[ingName].stock = Math.max(0, inventory[ingName].stock - qty);
+        logStockActivity(ingName, `-${qty.toFixed(2)} ${inventory[ingName].unit}`, `Adjust: ${reason}`);
+      } else {
+        inventory[ingName].stock += qty;
+        logStockActivity(ingName, `+${qty.toFixed(2)} ${inventory[ingName].unit}`, `Adjust: ${reason}`);
+      }
+
+      saveToDb('inventory', inventory);
+      qtyInput.value = '';
+      reasonInput.value = '';
+      alert(`Stock adjustment stored in database for ${ingName}!`);
+    }
+  }
+
+  function registerNewIngredient() {
+    const nameInput = document.getElementById('newIngName');
+    const unitInput = document.getElementById('newIngUnit');
+
+    const name = nameInput.value.trim();
+    const unit = unitInput.value.trim() || 'kg';
+
+    if (!name) {
+      alert("Please enter an ingredient name.");
+      return;
+    }
+
+    if (inventory[name]) {
+      alert("Ingredient already exists!");
+      return;
+    }
+
+    inventory[name] = { stock: 0.0, totalConsumed: 0.0, unit: unit, unitCost: 0 };
+    saveToDb('inventory', inventory)
+      .then(() => {
+        logStockActivity(name, `0.00 ${unit}`, 'Raw Material Created');
+        nameInput.value = '';
+        unitInput.value = '';
+        alert(`"${name}" was saved to the database.`);
+      })
+      .catch(() => {
+        delete inventory[name];
+      });
+  }
+
+  function renderInventory() {
+    const tbody = document.getElementById('inventoryBody');
+    if (!tbody) return;
+
+    tbody.innerHTML = Object.keys(inventory).map(key => {
+      const item = inventory[key];
+      const isLow = item.stock < 1.5;
+      return `
+        <tr>
+          <td><b>${key}</b></td>
+          <td class="mono">${item.stock.toFixed(2)} ${item.unit}</td>
+          <td class="mono" style="color:var(--teal-deep);">₹${(item.unitCost || 0).toFixed(2)} / ${item.unit}</td>
+          <td class="mono" style="color:#888;">${(item.totalConsumed || 0).toFixed(2)} ${item.unit}</td>
+          <td><span style="color:${isLow ? 'var(--chili)' : 'var(--teal)'}; font-weight:600; font-size:11.5px;">${isLow ? 'LOW STOCK' : 'OK'}</span></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function logStockActivity(ingredient, change, reason) {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    pushToDbList('stockLogs', { time, ingredient, change, reason });
+  }
+
+  function renderStockLogs() {
+    const tbody = document.getElementById('stockLogBody');
+    if (!tbody) return;
+
+    if (stockLogs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888; padding:16px;">No inventory activity recorded yet.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = stockLogs.map(log => `
+      <tr>
+        <td class="mono" style="font-size:11.5px;">${log.time}</td>
+        <td><b>${log.ingredient}</b></td>
+        <td class="mono">${log.change}</td>
+        <td style="font-size:12.5px; color:#6B7370;">${log.reason}</td>
+      </tr>
+    `).join('');
+  }
+
+  // 7. POS CHECKOUT & PRINT BILL LOGIC
+  function addToBill(id) {
+    const item = menu.find(m => m.id === id);
+    if (!item) return;
+    if (currentBill[id]) {
+      currentBill[id].qty++;
+    } else {
+      currentBill[id] = { ...item, qty: 1 };
+    }
+    updateBillUI();
+  }
+
+  function changeQty(id, delta) {
+    if (currentBill[id]) {
+      currentBill[id].qty += delta;
+      if (currentBill[id].qty <= 0) {
+        delete currentBill[id];
+      }
+    }
+    updateBillUI();
+  }
+
+  function updateBillUI() {
+    const tbody = document.getElementById('billItems');
+    if (!tbody) return;
+
+    const items = Object.values(currentBill);
+
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888; padding:20px;">No items added yet. Click items on the left menu.</td></tr>';
+      document.getElementById('subTotal').innerText = '₹0.00';
+      document.getElementById('discountTotal').innerText = '-₹0.00';
+      document.getElementById('taxTotal').innerText = '₹0.00';
+      document.getElementById('grandTotal').innerText = '₹0.00';
+      return;
+    }
+
+    let subtotal = 0;
+    tbody.innerHTML = items.map(item => {
+      const itemTotal = item.price * item.qty;
+      subtotal += itemTotal;
+      return `
+        <tr>
+          <td><b>${item.name}</b></td>
+          <td>
+            <div class="qty-controls">
+              <button class="qty-btn" onclick="changeQty(${item.id}, -1)">-</button>
+              <span class="mono">${item.qty}</span>
+              <button class="qty-btn" onclick="changeQty(${item.id}, 1)">+</button>
+            </div>
+          </td>
+          <td class="mono">₹${itemTotal}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const discVal = parseFloat(document.getElementById('discountValue').value) || 0;
+    const discType = document.getElementById('discountType').value;
+    let discountAmount = discType === 'percent' ? (subtotal * discVal) / 100 : discVal;
+    if (discountAmount > subtotal) discountAmount = subtotal;
+
+    const discountedSubtotal = subtotal - discountAmount;
+    const tax = discountedSubtotal * 0.05;
+    const grandTotal = discountedSubtotal + tax;
+
+    document.getElementById('subTotal').innerText = `₹${subtotal.toFixed(2)}`;
+    document.getElementById('discountTotal').innerText = `-₹${discountAmount.toFixed(2)}`;
+    document.getElementById('taxTotal').innerText = `₹${tax.toFixed(2)}`;
+    document.getElementById('grandTotal').innerText = `₹${grandTotal.toFixed(2)}`;
+  }
+
+  function clearBill() {
+    currentBill = {};
+    document.getElementById('discountValue').value = 0;
+    updateBillUI();
+  }
+
+  function printBill() {
+    const items = Object.values(currentBill);
+    if (items.length === 0) {
+      alert("Please add items to print a bill.");
+      return;
+    }
+
+    let subtotal = 0;
+    const tbody = document.getElementById('printReceiptItems');
+    
+    tbody.innerHTML = items.map(item => {
+      const itemTotal = item.price * item.qty;
+      subtotal += itemTotal;
+      return `
+        <tr>
+          <td>${item.name}</td>
+          <td style="text-align:center;">${item.qty}</td>
+          <td style="text-align:right;">₹${itemTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const discVal = parseFloat(document.getElementById('discountValue').value) || 0;
+    const discType = document.getElementById('discountType').value;
+    let discountAmount = discType === 'percent' ? (subtotal * discVal) / 100 : discVal;
+    if (discountAmount > subtotal) discountAmount = subtotal;
+
+    const discountedSubtotal = subtotal - discountAmount;
+    const tax = discountedSubtotal * 0.05;
+    const grandTotal = discountedSubtotal + tax;
+
+    document.getElementById('printDate').innerText = "Date: " + new Date().toLocaleString();
+    document.getElementById('printSubtotal').innerText = `₹${subtotal.toFixed(2)}`;
+    document.getElementById('printDiscount').innerText = `-₹${discountAmount.toFixed(2)}`;
+    document.getElementById('printTax').innerText = `₹${tax.toFixed(2)}`;
+    document.getElementById('printGrandTotal').innerText = `₹${grandTotal.toFixed(2)}`;
+
+    window.print();
+  }
+
+  function checkoutBill() {
+    const items = Object.values(currentBill);
+    if (items.length === 0) {
+      alert("Please add items to take a bill.");
+      return;
+    }
+
+    const now = new Date();
+    let subtotal = 0;
+    let orderCogs = 0;
+
+    items.forEach(item => {
+      subtotal += item.price * item.qty;
+
+      if (item.ingredients && Array.isArray(item.ingredients)) {
+        item.ingredients.forEach(ing => {
+          if (inventory[ing.name]) {
+            const totalDeductions = ing.usage * item.qty;
+            inventory[ing.name].stock = Math.max(0, inventory[ing.name].stock - totalDeductions);
+            inventory[ing.name].totalConsumed = (inventory[ing.name].totalConsumed || 0) + totalDeductions;
+
+            const costForThisIng = totalDeductions * (inventory[ing.name].unitCost || 0);
+            orderCogs += costForThisIng;
+
+            logStockActivity(
+              ing.name, 
+              `-${totalDeductions.toFixed(2)} ${inventory[ing.name].unit}`, 
+              `Sale: ${item.name} (x${item.qty})`
+            );
+          }
+        });
+      }
+    });
+
+    const discVal = parseFloat(document.getElementById('discountValue').value) || 0;
+    const discType = document.getElementById('discountType').value;
+    let discountAmount = discType === 'percent' ? (subtotal * discVal) / 100 : discVal;
+    if (discountAmount > subtotal) discountAmount = subtotal;
+
+    const discountedSubtotal = subtotal - discountAmount;
+    const tax = discountedSubtotal * 0.05;
+    const grossTotal = discountedSubtotal + tax;
+    const orderNetSale = discountedSubtotal - orderCogs;
+
+    // Create Transaction Record
+    const newOrderId = "ORD-" + Math.floor(1000 + Math.random() * 9000);
+    const completedTransaction = {
+      id: newOrderId,
+      timestamp: now.getTime(),
+      dateStr: now.toISOString(),
+      items: items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+      subtotal: subtotal,
+      discount: discountAmount,
+      tax: tax,
+      grossSales: grossTotal,
+      cogs: orderCogs,
+      netSales: orderNetSale
+    };
+
+    // Save order history list
+    pushToDbList('completedOrders', completedTransaction);
+
+    // Create Active Order for Kitchen Tracker
+    const newOrder = {
+      id: newOrderId,
+      createdAt: now.getTime(),
+      durationMs: 12 * 60 * 1000,
+      items: items.map(i => ({ name: i.name, qty: i.qty, price: i.price })),
+      status: 'preparing'
+    };
+    activeOrders.push(newOrder);
+
+    analytics.logEvent('purchase', {
+      value: grossTotal,
+      currency: 'INR',
+      tax: tax,
+      items: items.map(i => ({ item_id: String(i.id), item_name: i.name, price: i.price, quantity: i.qty }))
+    });
+
+    saveToDb('inventory', inventory);
+    saveToDb('activeOrders', activeOrders);
+
+    clearBill();
+    alert(`Bill completed & order added to Kitchen Prep Monitor!\nOrder ID: ${newOrderId}\nGross Total: ₹${grossTotal.toFixed(2)}`);
+  }
+
+  // 8. ORDER PREPARATION TRACKER LOGIC
+  function startPrepTimerLoop() {
+    if (prepTimerInterval) clearInterval(prepTimerInterval);
+    prepTimerInterval = setInterval(() => {
+      renderActiveOrders();
+    }, 1000);
+  }
+
+  function renderActiveOrders() {
+    const inProgressContainer = document.getElementById('inProgressGridContainer');
+    const recentContainer = document.getElementById('recentGridContainer');
+    if (!inProgressContainer || !recentContainer) return;
+
+    const now = Date.now();
+
+    // 1. RENDER IN-PROGRESS ORDERS
+    const preparingOrders = activeOrders.filter(o => o.status === 'preparing');
+
+    if (preparingOrders.length === 0) {
+      inProgressContainer.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#888; padding:30px;">No active orders in preparation queue.</div>';
+    } else {
+      inProgressContainer.innerHTML = preparingOrders.map(order => {
+        const elapsed = now - order.createdAt;
+        const totalDuration = order.durationMs || (12 * 60 * 1000);
+        const remainingMs = Math.max(0, totalDuration - elapsed);
+
+        const remainingSec = Math.floor(remainingMs / 1000);
+        const mins = Math.floor(remainingSec / 60);
+        const secs = remainingSec % 60;
+        const timerDisplay = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+        let progressPercent = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+
+        let barColor = 'var(--teal)';
+        if (progressPercent >= 75) barColor = 'var(--chili)';
+        else if (progressPercent >= 50) barColor = 'var(--saffron-deep)';
+
+        const itemsHtml = (order.items || []).map(i => `
+          <li><span><b>${i.qty}x</b> ${i.name}</span> <span class="mono">₹${i.price * i.qty}</span></li>
+        `).join('');
+
+        return `
+          <div class="order-card">
+            <div>
+              <div class="order-header">
+                <span class="order-id">${order.id}</span>
+                <span class="order-time-badge">${timerDisplay} rem</span>
+              </div>
+              <ul class="order-items-list">
+                ${itemsHtml}
+              </ul>
+            </div>
+            <div>
+              <div class="prep-progress-container">
+                <div class="prep-progress-header">
+                  <span>Preparation Progress</span>
+                  <span>${Math.round(progressPercent)}%</span>
+                </div>
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill" style="width: ${progressPercent}%; background-color: ${barColor};"></div>
+                </div>
+              </div>
+              <div class="order-actions">
+                <button class="btn-ready" onclick="markFoodReady('${order.id}')">Food Ready</button>
+                <button class="btn-cancel-order" onclick="cancelOrder('${order.id}')">Cancel Order</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 2. RENDER RECENT ORDERS
+    const recentOrders = activeOrders.filter(o => o.status === 'ready' || o.status === 'cancelled').reverse();
+
+    if (recentOrders.length === 0) {
+      recentContainer.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:#888; padding:30px;">No completed or recent orders yet.</div>';
+    } else {
+      recentContainer.innerHTML = recentOrders.map(order => {
+        const timeStr = new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const itemsHtml = (order.items || []).map(i => `
+          <li><span><b>${i.qty}x</b> ${i.name}</span> <span class="mono">₹${i.price * i.qty}</span></li>
+        `).join('');
+
+        const isReady = order.status === 'ready';
+        const badgeClass = isReady ? 'status-ready' : 'status-cancelled';
+        const badgeText = isReady ? 'FOOD READY' : 'CANCELLED';
+
+        return `
+          <div class="order-card">
+            <div>
+              <div class="order-header">
+                <span class="order-id">${order.id}</span>
+                <span class="order-status-badge ${badgeClass}">${badgeText}</span>
+              </div>
+              <p style="font-size:12px; color:#6B7370; margin:-4px 0 8px 0;">Order Time: ${timeStr}</p>
+              <ul class="order-items-list">
+                ${itemsHtml}
+              </ul>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  function markFoodReady(orderId) {
+    const order = activeOrders.find(o => o.id === orderId);
+    if (order) {
+      order.status = 'ready';
+      saveToDb('activeOrders', activeOrders);
+    }
+  }
+
+  function cancelOrder(orderId) {
+    if (confirm(`Are you sure you want to cancel order ${orderId}?`)) {
+      const order = activeOrders.find(o => o.id === orderId);
+      if (order) {
+        order.status = 'cancelled';
+        saveToDb('activeOrders', activeOrders);
+      }
+    }
+  }
+
+  // 9. TIME RANGE FILTER & SALES REPORTS COMPUTATION
+  function setTimeFilter(filterType) {
+    activeTimeFilter = filterType;
+    
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    
+    if(filterType === 'today') document.getElementById('btnFilterToday').classList.add('active');
+    else if(filterType === 'week') document.getElementById('btnFilterWeek').classList.add('active');
+    else if(filterType === 'month') document.getElementById('btnFilterMonth').classList.add('active');
+    else if(filterType === 'year') document.getElementById('btnFilterYear').classList.add('active');
+    else if(filterType === 'all') document.getElementById('btnFilterAll').classList.add('active');
+
+    // Clear custom date inputs when choosing a preset
+    document.getElementById('reportStartDate').value = '';
+    document.getElementById('reportEndDate').value = '';
+
+    filterSalesReport();
+  }
+
+  function applyCustomDateFilter() {
+    const startVal = document.getElementById('reportStartDate').value;
+    const endVal = document.getElementById('reportEndDate').value;
+
+    if(startVal || endVal) {
+      activeTimeFilter = 'custom';
+      document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+      filterSalesReport();
+    }
+  }
+
+  function filterSalesReport() {
+    const now = new Date();
+    let startTime = 0;
+    let endTime = Infinity;
+
+    if (activeTimeFilter === 'today') {
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      startTime = startOfDay.getTime();
+    } else if (activeTimeFilter === 'week') {
+      const dayOfWeek = now.getDay(); // 0 (Sun) to 6 (Sat)
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+      startTime = startOfWeek.getTime();
+    } else if (activeTimeFilter === 'month') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      startTime = startOfMonth.getTime();
+    } else if (activeTimeFilter === 'year') {
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      startTime = startOfYear.getTime();
+    } else if (activeTimeFilter === 'custom') {
+      const startVal = document.getElementById('reportStartDate').value;
+      const endVal = document.getElementById('reportEndDate').value;
+
+      if (startVal) {
+        startTime = new Date(startVal + 'T00:00:00').getTime();
+      }
+      if (endVal) {
+        endTime = new Date(endVal + 'T23:59:59').getTime();
+      }
+    }
+
+    // Filter order transactions based on selected date range
+    const matchingOrders = completedOrders.filter(o => o.timestamp >= startTime && o.timestamp <= endTime);
+
+    // Reset aggregation metrics
+    filteredSalesSummary = {
+      totalOrders: matchingOrders.length,
+      grossSales: 0,
+      totalDiscount: 0,
+      cogs: 0,
+      netSales: 0,
+      itemsSold: {}
+    };
+
+    let chartBuckets = {};
+
+    matchingOrders.forEach(order => {
+      filteredSalesSummary.grossSales += (order.grossSales || 0);
+      filteredSalesSummary.totalDiscount += (order.discount || 0);
+      filteredSalesSummary.cogs += (order.cogs || 0);
+      filteredSalesSummary.netSales += (order.netSales || 0);
+
+      // Aggregate Item-wise Breakdown
+      if (order.items && Array.isArray(order.items)) {
+        order.items.forEach(item => {
+          if (!filteredSalesSummary.itemsSold[item.name]) {
+            filteredSalesSummary.itemsSold[item.name] = { qty: 0, revenue: 0 };
+          }
+          filteredSalesSummary.itemsSold[item.name].qty += item.qty;
+          filteredSalesSummary.itemsSold[item.name].revenue += item.price * item.qty;
+        });
+      }
+
+      // Group chart timeline buckets according to range filter
+      const d = new Date(order.timestamp);
+      let bucketKey = '';
+
+      if (activeTimeFilter === 'today') {
+        bucketKey = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else if (activeTimeFilter === 'week' || activeTimeFilter === 'month') {
+        bucketKey = `${d.getMonth() + 1}/${d.getDate()}`;
+      } else if (activeTimeFilter === 'year') {
+        bucketKey = d.toLocaleString('default', { month: 'short' });
+      } else {
+        bucketKey = d.toLocaleDateString();
+      }
+
+      if (!chartBuckets[bucketKey]) {
+        chartBuckets[bucketKey] = { orders: 0, gross: 0, net: 0 };
+      }
+      chartBuckets[bucketKey].orders += 1;
+      chartBuckets[bucketKey].gross += (order.grossSales || 0);
+      chartBuckets[bucketKey].net += (order.netSales || 0);
+    });
+
+    renderReportsUI(chartBuckets);
+  }
+
+  function renderReportsUI(chartBuckets) {
+    document.getElementById('repOrders').innerText = filteredSalesSummary.totalOrders;
+    document.getElementById('repRevenue').innerText = `₹${filteredSalesSummary.grossSales.toFixed(2)}`;
+    document.getElementById('repDiscount').innerText = `₹${filteredSalesSummary.totalDiscount.toFixed(2)}`;
+    document.getElementById('repCogs').innerText = `₹${filteredSalesSummary.cogs.toFixed(2)}`;
+    document.getElementById('repNetSales').innerText = `₹${filteredSalesSummary.netSales.toFixed(2)}`;
+
+    // Render Breakdown Table
+    const tbody = document.getElementById('salesBreakdown');
+    if (tbody) {
+      const itemNames = Object.keys(filteredSalesSummary.itemsSold);
+
+      if (itemNames.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="color:#A9AFA9;">No sales recorded for the selected time range.</td></tr>';
+      } else {
+        tbody.innerHTML = itemNames.map(itemName => {
+          const data = filteredSalesSummary.itemsSold[itemName];
+          return `
+            <tr>
+              <td>${itemName}</td>
+              <td class="mono">${data.qty}</td>
+              <td class="mono">₹${data.revenue.toFixed(2)}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    // Render Charts
+    const timeLabels = Object.keys(chartBuckets);
+    const orderValues = timeLabels.map(k => chartBuckets[k].orders);
+    const grossValues = timeLabels.map(k => chartBuckets[k].gross);
+    const netValues = timeLabels.map(k => chartBuckets[k].net);
+
+    if (ordersChartInstance) {
+      ordersChartInstance.data.labels = timeLabels;
+      ordersChartInstance.data.datasets[0].data = orderValues;
+      ordersChartInstance.update();
+    }
+
+    if (grossChartInstance && netChartInstance) {
+      grossChartInstance.data.labels = timeLabels;
+      grossChartInstance.data.datasets[0].data = grossValues;
+      grossChartInstance.update();
+
+      netChartInstance.data.labels = timeLabels;
+      netChartInstance.data.datasets[0].data = netValues;
+      netChartInstance.update();
+    }
+  }
+
+  // 10. CHARTS INITIALIZATION
+  function initCharts() {
+    const ctxOrders = document.getElementById('ordersChart').getContext('2d');
+    ordersChartInstance = new Chart(ctxOrders, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Orders Processed',
+          data: [],
+          borderColor: '#4FD1C5',
+          backgroundColor: 'rgba(79, 209, 197, 0.15)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#CFE0DD', precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
+        },
+        plugins: { legend: { labels: { color: '#F7F3E8' } } }
+      }
+    });
+
+    const ctxGross = document.getElementById('grossSalesChart').getContext('2d');
+    grossChartInstance = new Chart(ctxGross, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Gross Revenue (₹)',
+          data: [],
+          borderColor: '#E8A33D',
+          backgroundColor: 'rgba(232, 163, 61, 0.15)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        plugins: { legend: { labels: { color: '#F7F3E8' } } }
+      }
+    });
+
+    const ctxNet = document.getElementById('netSalesChart').getContext('2d');
+    netChartInstance = new Chart(ctxNet, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Net Sales / Profit (₹)',
+          data: [],
+          borderColor: '#38A169',
+          backgroundColor: 'rgba(56, 161, 105, 0.15)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          y: { ticks: { color: '#CFE0DD' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        plugins: { legend: { labels: { color: '#F7F3E8' } } }
+      }
+    });
+  }
+
+  // 11. EXPORT REPORT FUNCTIONS
+  function exportSalesReportToExcel() {
+    const itemNames = Object.keys(filteredSalesSummary.itemsSold || {});
+    
+    const summaryData = [
+      { Metric: "Selected Filter", Value: activeTimeFilter.toUpperCase() },
+      { Metric: "Total Orders", Value: filteredSalesSummary.totalOrders },
+      { Metric: "Gross Revenue (₹)", Value: filteredSalesSummary.grossSales.toFixed(2) },
+      { Metric: "Discounts Given (₹)", Value: filteredSalesSummary.totalDiscount.toFixed(2) },
+      { Metric: "Raw Material COGS (₹)", Value: filteredSalesSummary.cogs.toFixed(2) },
+      { Metric: "Net Sales / Profit (₹)", Value: filteredSalesSummary.netSales.toFixed(2) }
+    ];
+
+    const breakdownData = itemNames.length > 0 
+      ? itemNames.map(name => ({
+          "Item Name": name,
+          "Units Sold": filteredSalesSummary.itemsSold[name].qty,
+          "Gross Revenue (₹)": filteredSalesSummary.itemsSold[name].revenue.toFixed(2)
+        }))
+      : [{ "Item Name": "No Sales Recorded", "Units Sold": 0, "Gross Revenue (₹)": "0.00" }];
+
+    const workbook = XLSX.utils.book_new();
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+    const breakdownSheet = XLSX.utils.json_to_sheet(breakdownData);
+
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary Metrics");
+    XLSX.utils.book_append_sheet(workbook, breakdownSheet, "Item Breakdown");
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `Bilkul_Sales_Report_${activeTimeFilter}_${dateStr}.xlsx`);
+  }
+
+  function exportSalesReportToWord() {
+    const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, WidthType, HeadingLevel, AlignmentType } = docx;
+
+    const itemNames = Object.keys(filteredSalesSummary.itemsSold || {});
+
+    const summaryRows = [
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Metric", bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Value", bold: true })] })] })
+        ]
+      }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Time Range Filter")] }), new TableCell({ children: [new Paragraph(activeTimeFilter.toUpperCase())] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Total Orders")] }), new TableCell({ children: [new Paragraph(String(filteredSalesSummary.totalOrders))] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Gross Revenue")] }), new TableCell({ children: [new Paragraph(`₹${filteredSalesSummary.grossSales.toFixed(2)}`)] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Discounts Given")] }), new TableCell({ children: [new Paragraph(`₹${filteredSalesSummary.totalDiscount.toFixed(2)}`)] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Total Raw Material Cost")] }), new TableCell({ children: [new Paragraph(`₹${filteredSalesSummary.cogs.toFixed(2)}`)] })] }),
+      new TableRow({ children: [new TableCell({ children: [new Paragraph("Net Sales (Profit)")] }), new TableCell({ children: [new Paragraph(`₹${filteredSalesSummary.netSales.toFixed(2)}`)] })] })
+    ];
+
+    const breakdownRows = [
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Item Name", bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Units Sold", bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Gross Revenue (₹)", bold: true })] })] })
+        ]
+      })
+    ];
+
+    if (itemNames.length === 0) {
+      breakdownRows.push(new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph("No sales recorded yet")] }),
+          new TableCell({ children: [new Paragraph("0")] }),
+          new TableCell({ children: [new Paragraph("0.00")] })
+        ]
+      }));
+    } else {
+      itemNames.forEach(name => {
+        breakdownRows.push(new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph(name)] }),
+            new TableCell({ children: [new Paragraph(String(filteredSalesSummary.itemsSold[name].qty))] }),
+            new TableCell({ children: [new Paragraph(`₹${filteredSalesSummary.itemsSold[name].revenue.toFixed(2)}`)] })
+          ]
+        }));
+      });
+    }
+
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            text: "Bilkul POS - Sales & Profit Report",
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER
+          }),
+          new Paragraph({
+            text: `Generated Date: ${new Date().toLocaleString()}`,
+            alignment: AlignmentType.CENTER,
+            space: { after: 300 }
+          }),
+          new Paragraph({ text: "Summary Metrics", heading: HeadingLevel.HEADING_2, space: { after: 150 } }),
+          new Table({
+            rows: summaryRows,
+            width: { size: 100, type: WidthType.PERCENTAGE }
+          }),
+          new Paragraph({ text: "Item-Wise Sales Breakdown", heading: HeadingLevel.HEADING_2, space: { before: 300, after: 150 } }),
+          new Table({
+            rows: breakdownRows,
+            width: { size: 100, type: WidthType.PERCENTAGE }
+          })
+        ]
+      }]
+    });
+
+    Packer.toBlob(doc).then(blob => {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      saveAs(blob, `Bilkul_Sales_Report_${activeTimeFilter}_${dateStr}.docx`);
+    });
+  }
+
+  // Initializing default state for recipe form
+  resetRecipeForm();
+</script>
+
+</body>
+</html>
